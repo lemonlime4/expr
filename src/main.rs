@@ -1,28 +1,26 @@
 mod lex;
 mod parse;
-use crate::lex::*;
+use crate::parse::parse;
 
 fn main() {
-    use io::Write;
     use std::io;
+    use std::io::Write;
     loop {
         let mut input = String::new();
-        if let Err(error) = std::io::stdin().read_line(&mut input) {
+        if let Err(error) = io::stdin().read_line(&mut input) {
             println!("error: {error}")
         }
         input = input.trim().to_string();
 
-        match lex(&input) {
-            Ok(tokens) => {
-                for token in tokens {
-                    print!("{token} ");
-                }
-                println!("\n");
-                std::io::stdout().flush().unwrap();
+        match parse(&input) {
+            Ok(expr) => {
+                println!("{expr:#?}");
+                println!("{expr}   -- parsed");
+                io::stdout().flush().unwrap();
             }
             Err(message) => {
                 eprintln!("-- {message} --");
-                std::io::stderr().flush().unwrap();
+                io::stderr().flush().unwrap();
             }
         }
     }

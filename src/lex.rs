@@ -1,108 +1,7 @@
 use std::fmt;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Operator {
-    Equals,
-    Plus,
-    Minus,
-    Dot,
-    Slash,
-}
-
-impl fmt::Display for Operator {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use Operator::*;
-        write!(
-            f,
-            "{}",
-            match self {
-                Equals => "=",
-                Plus => "+",
-                Minus => "-",
-                Dot => "*",
-                Slash => "/",
-            }
-        )
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum BracketSide {
-    Left,
-    Right,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum BracketKind {
-    Paren,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Bracket {
-    side: BracketSide,
-    kind: BracketKind,
-}
-
-impl Bracket {
-    const LEFT_PAREN: Self = Self {
-        side: BracketSide::Left,
-        kind: BracketKind::Paren,
-    };
-    const RIGHT_PAREN: Self = Self {
-        side: BracketSide::Right,
-        kind: BracketKind::Paren,
-    };
-}
-
-impl fmt::Display for Bracket {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use BracketKind::*;
-        use BracketSide::*;
-        write!(
-            f,
-            "{}",
-            match (self.side, self.kind) {
-                (Left, Paren) => "(",
-                (Right, Paren) => ")",
-            }
-        )
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Token {
-    Ident(String),
-    Lit(String),
-    Op(Operator),
-    Bracket(Bracket),
-    Newline,
-    // Whitespace,
-}
-
-impl From<Operator> for Token {
-    fn from(op: Operator) -> Token {
-        Token::Op(op)
-    }
-}
-
-impl From<Bracket> for Token {
-    fn from(bracket: Bracket) -> Token {
-        Token::Bracket(bracket)
-    }
-}
-
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use Token::*;
-        match self {
-            Ident(i) => write!(f, "{i}"),
-            Lit(l) => write!(f, "{l}"),
-            Op(o) => write!(f, "{o}"),
-            Bracket(b) => write!(f, "{b}"),
-            Newline => write!(f, "\\n"),
-            // Whitespace => write!(f, "\\s"),
-        }
-    }
+pub fn lex(input: &str) -> Result<Vec<Token>, String> {
+    Lexer::new(input).run()
 }
 
 struct Lexer<'a> {
@@ -152,31 +51,48 @@ impl<'a> Lexer<'a> {
                 break Ok(self.tokens);
             }
             let c = c.unwrap();
-            let token: Token = match c {
-                '=' => Operator::Equals.into(),
-                '+' => Operator::Plus.into(),
-                '-' => Operator::Minus.into(),
-                '*' => Operator::Dot.into(),
-                '/' => Operator::Slash.into(),
-                '(' => Bracket::LEFT_PAREN.into(),
-                ')' => Bracket::RIGHT_PAREN.into(),
-                '\n' => Token::Newline,
+            let token = match c {
+                // '\n' => Token::Newline,
+                '\\' => Token::Lambda,
+                '.' => Token::Dot,
+                '(' => Token::LeftP,
+                ')' => Token::RightP,
+                '=' => Token::Equals,
                 c if c.is_ascii_alphabetic() => {
                     self.next_char_while(|c| c.is_ascii_alphabetic());
                     Token::Ident(self.input[start..self.pos].to_string())
                 }
-                c if c.is_digit(10) => {
-                    self.next_char_while(|c| c.is_digit(10));
-                    Token::Lit(self.input[start..self.pos].to_string())
-                }
-                _ => Err(format!("unknown token '{c}'"))?,
+                _ => Err(format!("unknown start of token '{c}'"))?,
             };
-            println!("-- read {token:?}");
+            // println!("-- read {token:?}");
             self.tokens.push(token);
         }
     }
 }
 
-pub fn lex(input: &str) -> Result<Vec<Token>, String> {
-    Lexer::new(input).run()
+pub type Ident = String;
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Token {
+    // Newline,
+    Lambda,
+    Dot,
+    LeftP,
+    RightP,
+    Equals,
+    Ident(Ident),
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            // Newline => write!(f, "\\n"),
+            Token::Lambda => write!(f, "\\"),
+            Token::Dot => write!(f, "."),
+            Token::LeftP => write!(f, "("),
+            Token::RightP => write!(f, ")"),
+            Token::Equals => write!(f, "="),
+            Token::Ident(ident) => write!(f, "{ident}"),
+        }
+    }
 }
