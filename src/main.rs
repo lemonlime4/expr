@@ -1,6 +1,7 @@
 mod lex;
 mod parse;
-use crate::parse::parse;
+mod types;
+use crate::{parse::parse, types::type_check};
 
 fn main() {
     use std::io;
@@ -16,12 +17,18 @@ fn main() {
             Ok(expr) => {
                 println!("{expr:#?}");
                 println!("{expr}   -- parsed");
-                io::stdout().flush().unwrap();
+
+                match type_check(expr) {
+                    Ok(typed) => println!("{typed}   -- typed"),
+                    Err(message) => eprintln!("-- {message} --"),
+                };
             }
             Err(message) => {
                 eprintln!("-- {message} --");
-                io::stderr().flush().unwrap();
             }
         }
+        println!("");
+        io::stdout().flush().unwrap();
+        io::stderr().flush().unwrap();
     }
 }
