@@ -60,7 +60,7 @@ impl<'a> Lexer<'a> {
                 '=' => Token::Equals,
                 c if c.is_ascii_alphabetic() => {
                     self.next_char_while(|c| c.is_ascii_alphabetic());
-                    Token::Ident(self.input[start..self.pos].to_string())
+                    Token::Ident(self.input[start..self.pos].into())
                 }
                 _ => Err(format!("unknown start of token '{c}'"))?,
             };
@@ -70,7 +70,7 @@ impl<'a> Lexer<'a> {
     }
 }
 
-pub type Ident = String;
+pub type Ident = EcoString;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Token {
