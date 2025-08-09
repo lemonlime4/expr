@@ -88,14 +88,8 @@ impl<V: ExprVarDisplay> fmt::Display for Expr<V> {
                 body.fmt(f)
             }
             Self::App { func, arg } => {
-                let left_paren = match **func {
-                    Self::Abs { .. } => true,
-                    _ => false,
-                };
-                let right_paren = match **arg {
-                    Self::Var(..) => false,
-                    _ => true,
-                };
+                let left_paren = matches!(**func, Self::Abs { .. });
+                let right_paren = !matches!(**arg, Self::Var(..));
                 match (left_paren, right_paren) {
                     (false, false) => write!(f, "{func} {arg}"),
                     (true, false) => write!(f, "({func}) {arg}"),

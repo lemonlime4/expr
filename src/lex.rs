@@ -1,5 +1,7 @@
 use std::fmt;
 
+use ecow::EcoString;
+
 pub fn lex(input: &str) -> Result<Vec<Token>, String> {
     Lexer::new(input).run()
 }

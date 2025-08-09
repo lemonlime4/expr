@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+
+mod ast;
 mod lex;
 mod parse;
 use crate::parse::parse;
