@@ -201,8 +201,6 @@ impl<'a> Lexer<'a> {
         self.next_char_while(|c| c.is_ascii_whitespace());
 
         while let (start, Some(c)) = (self.pos, self.next_char()) {
-            self.next_char_while(|c| c.is_ascii_whitespace());
-
             let token = match c {
                 '\r' if self.next_char_exact('\n') => Token::Newline,
                 '\n' => Token::Newline,
@@ -231,8 +229,9 @@ impl<'a> Lexer<'a> {
                 }
                 _ => Err(format!("Unexpected start of token '{c}'"))?,
             };
-            println!("-- read {token:?}");
+            println!("lex -- read {token:?}");
             self.tokens.push(token);
+            self.next_char_while(|c| c.is_ascii_whitespace());
         }
 
         Ok(self.tokens)
