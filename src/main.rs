@@ -1,6 +1,10 @@
+#![allow(unused)]
 mod lex;
 mod parse;
-use crate::lex::*;
+use crate::{
+    lex::*,
+    parse::{parse, parse_tokens},
+};
 
 fn main() {
     use io::Write;
@@ -13,17 +17,21 @@ fn main() {
         input = input.trim().to_string();
 
         match lex(&input) {
-            Ok(tokens) => {
-                for token in tokens {
-                    print!("{token} ");
+            Ok(tokens) => match parse_tokens(&tokens) {
+                Ok(expr) => {
+                    println!("{expr:?}");
+                    // println!("{expr}");
                 }
-                println!("\n");
-                std::io::stdout().flush().unwrap();
-            }
+                Err(message) => {
+                    eprintln!("-- message -- parse error");
+                }
+            },
             Err(message) => {
-                eprintln!("-- {message} --");
-                std::io::stderr().flush().unwrap();
+                eprintln!("-- {message} -- lex error");
             }
         }
+        println!("\n");
+        std::io::stdout().flush().unwrap();
+        std::io::stderr().flush().unwrap();
     }
 }

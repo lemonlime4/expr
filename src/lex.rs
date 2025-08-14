@@ -1,114 +1,131 @@
 use std::fmt;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Operator {
+// #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+// pub enum Operator {
+//     Equals,
+//     Plus,
+//     Minus,
+//     Dot,
+//     Slash,
+// }
+
+// impl fmt::Display for Operator {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         use Operator::*;
+//         write!(
+//             f,
+//             "{}",
+//             match self {
+//                 Equals => "=",
+//                 Plus => "+",
+//                 Minus => "-",
+//                 Dot => "*",
+//                 Slash => "/",
+//             }
+//         )
+//     }
+// }
+
+// #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+// pub enum BracketSide {
+//     Left,
+//     Right,
+// }
+
+// #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+// pub enum BracketKind {
+//     Paren,
+// }
+
+// #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+// pub struct Bracket {
+//     side: BracketSide,
+//     kind: BracketKind,
+// }
+
+// impl Bracket {
+//     const LEFT_PAREN: Self = Self {
+//         side: BracketSide::Left,
+//         kind: BracketKind::Paren,
+//     };
+//     const RIGHT_PAREN: Self = Self {
+//         side: BracketSide::Right,
+//         kind: BracketKind::Paren,
+//     };
+// }
+
+// impl fmt::Display for Bracket {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         use BracketKind::*;
+//         use BracketSide::*;
+//         write!(
+//             f,
+//             "{}",
+//             match (self.side, self.kind) {
+//                 (Left, Paren) => "(",
+//                 (Right, Paren) => ")",
+//             }
+//         )
+//     }
+// }
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Token<'a> {
+    Ident(&'a str),
+    NumLit(&'a str),
+    Newline,
+    LeftParen,
+    RightParen,
+    Dot,
+
     Equals,
     Plus,
     Minus,
-    Dot,
+    Cdot,
     Slash,
 }
 
-impl fmt::Display for Operator {
+// impl From<Operator> for Token<'_> {
+//     fn from(op: Operator) -> Token<'static> {
+//         Token::Op(op)
+//     }
+// }
+
+// impl From<Bracket> for Token<'_> {
+//     fn from(bracket: Bracket) -> Token<'static> {
+//         Token::Bracket(bracket)
+//     }
+// }
+
+impl fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use Operator::*;
-        write!(
-            f,
-            "{}",
-            match self {
-                Equals => "=",
-                Plus => "+",
-                Minus => "-",
-                Dot => "*",
-                Slash => "/",
-            }
-        )
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum BracketSide {
-    Left,
-    Right,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum BracketKind {
-    Paren,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Bracket {
-    side: BracketSide,
-    kind: BracketKind,
-}
-
-impl Bracket {
-    const LEFT_PAREN: Self = Self {
-        side: BracketSide::Left,
-        kind: BracketKind::Paren,
-    };
-    const RIGHT_PAREN: Self = Self {
-        side: BracketSide::Right,
-        kind: BracketKind::Paren,
-    };
-}
-
-impl fmt::Display for Bracket {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use BracketKind::*;
-        use BracketSide::*;
-        write!(
-            f,
-            "{}",
-            match (self.side, self.kind) {
-                (Left, Paren) => "(",
-                (Right, Paren) => ")",
-            }
-        )
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Token {
-    Ident(String),
-    Lit(String),
-    Op(Operator),
-    Bracket(Bracket),
-    Newline,
-    // Whitespace,
-}
-
-impl From<Operator> for Token {
-    fn from(op: Operator) -> Token {
-        Token::Op(op)
-    }
-}
-
-impl From<Bracket> for Token {
-    fn from(bracket: Bracket) -> Token {
-        Token::Bracket(bracket)
-    }
-}
-
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use Token::*;
-        match self {
-            Ident(i) => write!(f, "{i}"),
-            Lit(l) => write!(f, "{l}"),
-            Op(o) => write!(f, "{o}"),
-            Bracket(b) => write!(f, "{b}"),
-            Newline => write!(f, "\\n"),
-            // Whitespace => write!(f, "\\s"),
-        }
+        // match self {
+        //     Ident(i) => write!(f, "{i}"),
+        //     NumLit(l) => write!(f, "{l}"),
+        //     Op(o) => write!(f, "{o}"),
+        //     Bracket(b) => write!(f, "{b}"),
+        //     Newline => write!(f, "\\n"),
+        //     // Whitespace => write!(f, "\\s"),
+        // }
+        f.write_str(match self {
+            Self::Ident(s) | Self::NumLit(s) => s,
+            Self::Newline => "\\n",
+            Self::LeftParen => "(",
+            Self::RightParen => ")",
+            Self::Dot => ".",
+            Self::Equals => "=",
+            Self::Plus => "+",
+            Self::Minus => "-",
+            Self::Cdot => "*",
+            Self::Slash => "/",
+        })
     }
 }
 
 struct Lexer<'a> {
     input: &'a str,
     pos: usize,
-    tokens: Vec<Token>,
+    tokens: Vec<Token<'a>>,
 }
 
 impl<'a> Lexer<'a> {
@@ -139,41 +156,84 @@ impl<'a> Lexer<'a> {
         self.next_char_if(|_| true)
     }
 
-    fn next_char_while(&mut self, f: impl Fn(char) -> bool) {
-        while self.next_char_if(&f).is_some() {}
+    fn next_char_exact(&mut self, c: char) -> bool {
+        self.next_char_if(|next| next == c).is_some()
     }
 
-    fn run(mut self) -> Result<Vec<Token>, String> {
-        loop {
-            self.next_char_while(|c| c.is_ascii_whitespace());
-            let start = self.pos;
-            let c = self.next_char();
-            if c.is_none() {
-                break Ok(self.tokens);
+    fn one_or_more_greedy(&mut self, f: impl Fn(char) -> bool) -> bool {
+        let mut found = false;
+        while self.next_char_if(&f).is_some() {
+            found = true;
+        }
+        found
+    }
+
+    fn next_char_while(&mut self, f: impl Fn(char) -> bool) {
+        self.one_or_more_greedy(f);
+    }
+
+    fn read_digits(&mut self) -> bool {
+        self.one_or_more_greedy(|c| c.is_ascii_digit())
+    }
+
+    fn read_number_unsigned(&mut self) -> bool {
+        if self.read_digits() {
+            self.next_char_exact('.');
+            self.read_digits();
+            return true;
+        }
+        let start = self.pos;
+        if self.next_char_exact('.') {
+            if self.read_digits() {
+                true
+            } else {
+                self.pos = start;
+                false
             }
-            let c = c.unwrap();
-            let token: Token = match c {
-                '=' => Operator::Equals.into(),
-                '+' => Operator::Plus.into(),
-                '-' => Operator::Minus.into(),
-                '*' => Operator::Dot.into(),
-                '/' => Operator::Slash.into(),
-                '(' => Bracket::LEFT_PAREN.into(),
-                ')' => Bracket::RIGHT_PAREN.into(),
+        } else {
+            false
+        }
+    }
+
+    fn run(mut self) -> Result<Vec<Token<'a>>, String> {
+        self.next_char_while(|c| c.is_ascii_whitespace());
+
+        while let (start, Some(c)) = (self.pos, self.next_char()) {
+            self.next_char_while(|c| c.is_ascii_whitespace());
+
+            let token = match c {
+                '\r' if self.next_char_exact('\n') => Token::Newline,
                 '\n' => Token::Newline,
+                ')' => Token::RightParen,
+                '(' => Token::LeftParen,
+                '=' => Token::Equals,
+                '+' => Token::Plus,
+                '-' => Token::Minus,
+                '*' => Token::Cdot,
+                '/' => Token::Slash,
                 c if c.is_ascii_alphabetic() => {
                     self.next_char_while(|c| c.is_ascii_alphabetic());
-                    Token::Ident(self.input[start..self.pos].to_string())
+                    Token::Ident(&self.input[start..self.pos])
                 }
-                c if c.is_digit(10) => {
-                    self.next_char_while(|c| c.is_digit(10));
-                    Token::Lit(self.input[start..self.pos].to_string())
+                '0'..='9' => {
+                    self.pos = start;
+                    self.read_number_unsigned();
+                    Token::NumLit(&self.input[start..self.pos])
                 }
-                _ => Err(format!("unknown token '{c}'"))?,
+                '.' => {
+                    if self.read_digits() {
+                        Token::NumLit(&self.input[start..self.pos])
+                    } else {
+                        Token::Dot
+                    }
+                }
+                _ => Err(format!("Unexpected start of token '{c}'"))?,
             };
             println!("-- read {token:?}");
             self.tokens.push(token);
         }
+
+        Ok(self.tokens)
     }
 }
 
