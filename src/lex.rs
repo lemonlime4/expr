@@ -1,5 +1,7 @@
 use std::fmt;
 
+use ecow::EcoString;
+
 // #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 // pub enum Operator {
 //     Equals,
@@ -70,9 +72,9 @@ use std::fmt;
 // }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Token<'a> {
-    Ident(&'a str),
-    NumLit(&'a str),
+pub enum Token {
+    Ident(EcoString),
+    NumLit(EcoString),
     Newline,
     LeftParen,
     RightParen,
@@ -97,7 +99,7 @@ pub enum Token<'a> {
 //     }
 // }
 
-impl fmt::Display for Token<'_> {
+impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // match self {
         //     Ident(i) => write!(f, "{i}"),
@@ -125,7 +127,7 @@ impl fmt::Display for Token<'_> {
 struct Lexer<'a> {
     input: &'a str,
     pos: usize,
-    tokens: Vec<Token<'a>>,
+    tokens: Vec<Token>,
 }
 
 impl<'a> Lexer<'a> {
@@ -195,7 +197,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn run(mut self) -> Result<Vec<Token<'a>>, String> {
+    fn run(mut self) -> Result<Vec<Token>, String> {
         self.next_char_while(|c| c.is_ascii_whitespace());
 
         while let (start, Some(c)) = (self.pos, self.next_char()) {
@@ -213,16 +215,16 @@ impl<'a> Lexer<'a> {
                 '/' => Token::Slash,
                 c if c.is_ascii_alphabetic() => {
                     self.next_char_while(|c| c.is_ascii_alphabetic());
-                    Token::Ident(&self.input[start..self.pos])
+                    Token::Ident(EcoString::from(&self.input[start..self.pos]))
                 }
                 '0'..='9' => {
                     self.pos = start;
                     self.read_number_unsigned();
-                    Token::NumLit(&self.input[start..self.pos])
+                    Token::NumLit(EcoString::from(&self.input[start..self.pos]))
                 }
                 '.' => {
                     if self.read_digits() {
-                        Token::NumLit(&self.input[start..self.pos])
+                        Token::NumLit(EcoString::from(&self.input[start..self.pos]))
                     } else {
                         Token::Dot
                     }
