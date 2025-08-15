@@ -1,6 +1,0 @@
-a = 3
-b = 4
-cc = a*a + b*b
-a
-b
-cc
