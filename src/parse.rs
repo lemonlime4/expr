@@ -7,7 +7,7 @@ use ecow::{EcoString, EcoVec};
 
 use crate::lex::{Token, lex};
 
-type Ident = ecow::EcoString;
+pub type Ident = ecow::EcoString;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
@@ -98,7 +98,7 @@ impl Parser {
         }
     }
 
-    fn next_while<T>(&mut self, mut f: impl FnMut(&Token) -> Option<T>) -> Vec<T> {
+    fn consume_while<T>(&mut self, mut f: impl FnMut(&Token) -> Option<T>) -> Vec<T> {
         let mut result = Vec::new();
         while let Some(processed) = self.peek().and_then(&mut f) {
             self.next();
@@ -112,8 +112,8 @@ impl Parser {
         last_op: Option<BinaryOp>,
         skip_newlines: bool,
     ) -> Result<Expr, String> {
-        // println!("parsing {:?}", self.tokens);
-        let signs = self.next_while(|t| match t {
+        // println!("parsing expr {:?}", self.tokens);
+        let signs = self.consume_while(|t| match t {
             Token::Minus => Some(true),
             Token::Plus => Some(false),
             _ => None,
@@ -159,7 +159,7 @@ impl Parser {
     pub fn parse(&mut self) -> Result<Vec<TopLevelItem>, String> {
         let mut items = Vec::new();
         loop {
-            println!("{:?}", self.tokens);
+            // println!("parsing item {:?}", self.tokens);
             let mut assigned_name = None;
             if matches!(self.tokens.as_slice(), [.., Token::Equals, Token::Ident(_)]) {
                 let ident = self.next().unwrap();
@@ -181,6 +181,9 @@ impl Parser {
                     while self.peek() == Some(&Token::Newline) {
                         self.next();
                     }
+                    if self.peek().is_none() {
+                        break;
+                    }
                 }
                 None => break,
                 Some(t) => Err(format!("Expected newline but got {t}"))?,
@@ -191,7 +194,6 @@ impl Parser {
 }
 
 pub fn parse(input: &str) -> Result<Vec<TopLevelItem>, String> {
-    println!("{input:?}");
     let tokens = lex(input)?;
     Parser::new(tokens).parse()
 }

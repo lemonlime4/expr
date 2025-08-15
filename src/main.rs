@@ -1,12 +1,16 @@
 #![allow(unused)]
 mod lex;
 mod parse;
+mod run;
 use std::{path::Path, sync::mpsc, time::Duration};
 
 use notify::{Event, RecursiveMode, Watcher, recommended_watcher};
 use notify_debouncer_full::{DebounceEventResult, new_debouncer, notify};
 
-use crate::parse::{BinaryOp, Expr, parse};
+use crate::{
+    parse::{BinaryOp, Expr, parse},
+    run::Interpreter,
+};
 
 fn main() {
     use io::Write;
@@ -28,16 +32,21 @@ fn main() {
 
         println!("--------------------------------");
         match parse(input.as_str()) {
-            Ok(items) => {
-                for item in items {
-                    println!("{item}");
+            Ok(items) => match Interpreter::new().run(items) {
+                Ok(results) => {
+                    for result in results {
+                        println!("{result}");
+                    }
                 }
-            }
+                Err(message) => {
+                    println!("-- {message} --");
+                }
+            },
             Err(message) => {
                 println!("-- {message} --");
             }
         }
-        println!("\n");
+        println!();
         std::io::stdout().flush().unwrap();
 
         recv.recv();
