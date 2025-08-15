@@ -1,37 +1,45 @@
 #![allow(unused)]
 mod lex;
 mod parse;
+use std::{path::Path, sync::mpsc, time::Duration};
+
+use notify::{Event, RecursiveMode, Watcher, recommended_watcher};
+use notify_debouncer_full::{DebounceEventResult, new_debouncer, notify};
+
 use crate::parse::{BinaryOp, Expr, parse};
 
 fn main() {
     use io::Write;
     use std::io;
-    println!(
-        "{}",
-        Expr::bin_op(
-            BinaryOp::DotProduct,
-            Expr::Lit(1.0),
-            Expr::bin_op(BinaryOp::Add, Expr::Lit(1.0), Expr::Lit(1.0))
-        )
-    );
-    loop {
-        let mut input = String::new();
-        if let Err(error) = std::io::stdin().read_line(&mut input) {
-            println!("error: {error}")
-        }
-        input = input.trim().to_string();
 
-        match parse(&input) {
-            Ok(expr) => {
-                println!("{expr}");
-                // println!("{expr}");
+    let (send, recv) = mpsc::channel();
+    let mut debouncer = new_debouncer(Duration::from_millis(100), None, send).unwrap();
+    debouncer
+        .watch("./input.txt", RecursiveMode::NonRecursive)
+        .unwrap();
+
+    // repl
+    loop {
+        let mut input = std::fs::read_to_string(Path::new("./input.txt")).unwrap();
+        // let mut input = String::new();
+        // if let Err(error) = std::io::stdin().read_line(&mut input) {
+        //     println!("error: {error}")
+        // }
+
+        println!("--------------------------------");
+        match parse(input.as_str()) {
+            Ok(items) => {
+                for item in items {
+                    println!("{item}");
+                }
             }
             Err(message) => {
-                eprintln!("-- {message} --");
+                println!("-- {message} --");
             }
         }
         println!("\n");
         std::io::stdout().flush().unwrap();
-        std::io::stderr().flush().unwrap();
+
+        recv.recv();
     }
 }

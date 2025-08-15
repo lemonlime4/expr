@@ -1,16 +1,13 @@
-// use std::rc::Rc;
-
 use std::{
     cmp::{self, Ordering},
     fmt::{self, Binary},
 };
 
-use ecow::EcoVec;
+use ecow::{EcoString, EcoVec};
 
 use crate::lex::{Token, lex};
 
 type Ident = ecow::EcoString;
-// type Ident = Rc<str>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
@@ -44,11 +41,10 @@ pub enum UnaryOp {
 pub enum Expr {
     Lit(f64),
     Variable(Ident),
-    Call {
-        func: Ident,
-        arg: Box<Expr>,
-        args: EcoVec<Expr>,
-    },
+    // Call {
+    //     func: Ident,
+    //     args: ArgList<Box<Expr>>,
+    // },
     UnOp {
         op: UnaryOp,
         arg: Box<Expr>,
@@ -58,6 +54,22 @@ pub enum Expr {
         left: Box<Expr>,
         right: Box<Expr>,
     },
+}
+
+pub enum TopLevelItem {
+    Expression(Expr),
+    Assignment { name: Ident, body: Expr },
+    // FunctionDef {
+    //     name: Ident,
+    //     args: ArgList<Ident>,
+    //     body: Expr,
+    // },
+}
+
+#[derive(Debug)]
+pub struct ArgList<T> {
+    head: T,
+    tail: Vec<T>,
 }
 
 struct Parser {
@@ -78,6 +90,14 @@ impl Parser {
         self.tokens.pop()
     }
 
+    fn next_if(&mut self, f: impl Fn(&Token) -> bool) -> Option<Token> {
+        if self.peek().is_some_and(f) {
+            self.next()
+        } else {
+            None
+        }
+    }
+
     fn next_while<T>(&mut self, mut f: impl FnMut(&Token) -> Option<T>) -> Vec<T> {
         let mut result = Vec::new();
         while let Some(processed) = self.peek().and_then(&mut f) {
@@ -87,17 +107,12 @@ impl Parser {
         result
     }
 
-    // fn next_if(&mut self, f: impl Fn(&Token) -> bool) -> Option<Token> {
-    //     if self.peek().is_some_and(f) {
-    //         self.next()
-    //     } else {
-    //         None
-    //     }
-    // }
-
-    pub fn parse(&mut self, last_op: Option<BinaryOp>) -> Result<Expr, String> {
-        println!("parsing {:?}", self.tokens);
-        // let negated = self.next_if(|t| *t == Token::Minus).is_some();
+    pub fn parse_expr(
+        &mut self,
+        last_op: Option<BinaryOp>,
+        skip_newlines: bool,
+    ) -> Result<Expr, String> {
+        // println!("parsing {:?}", self.tokens);
         let signs = self.next_while(|t| match t {
             Token::Minus => Some(true),
             Token::Plus => Some(false),
@@ -105,7 +120,7 @@ impl Parser {
         });
         let mut left = match self.next() {
             Some(Token::LeftParen) => {
-                let inner = self.parse(None)?;
+                let inner = self.parse_expr(None, true)?;
                 if self.next() != Some(Token::RightParen) {
                     Err("Expected )")?;
                 }
@@ -129,38 +144,76 @@ impl Parser {
                 Some(Token::Minus) => BinaryOp::Subtract,
                 Some(Token::Cdot) => BinaryOp::DotProduct,
                 Some(Token::Slash) => BinaryOp::Divide,
-                _ => return Ok(left),
+                _ => break Ok(left),
             };
             if Some(op.binding_power()) > last_op.map(|op| op.binding_power()) {
                 self.next();
-                println!("parse -- recursing -- {op:?}");
-                let right = self.parse(Some(op))?;
+                let right = self.parse_expr(Some(op), false)?;
                 left = Expr::bin_op(op, left, right);
             } else {
                 break Ok(left);
             }
         }
     }
+
+    pub fn parse(&mut self) -> Result<Vec<TopLevelItem>, String> {
+        let mut items = Vec::new();
+        loop {
+            println!("{:?}", self.tokens);
+            let mut assigned_name = None;
+            if matches!(self.tokens.as_slice(), [.., Token::Equals, Token::Ident(_)]) {
+                let ident = self.next().unwrap();
+                self.next();
+                assigned_name = Some(match ident {
+                    Token::Ident(name) => name,
+                    _ => unreachable!(),
+                })
+            }
+
+            let expr = self.parse_expr(None, false)?;
+            items.push(match assigned_name {
+                Some(name) => TopLevelItem::Assignment { name, body: expr },
+                None => TopLevelItem::Expression(expr),
+            });
+
+            match self.peek() {
+                Some(Token::Newline) => {
+                    while self.peek() == Some(&Token::Newline) {
+                        self.next();
+                    }
+                }
+                None => break,
+                Some(t) => Err(format!("Expected newline but got {t}"))?,
+            }
+        }
+        Ok(items)
+    }
 }
 
-pub fn parse(input: &str) -> Result<Expr, String> {
+pub fn parse(input: &str) -> Result<Vec<TopLevelItem>, String> {
+    println!("{input:?}");
     let tokens = lex(input)?;
-    Parser::new(tokens).parse(None)
+    Parser::new(tokens).parse()
 }
 
-impl Expr {
-    pub fn un_op(op: UnaryOp, arg: Self) -> Self {
-        Self::UnOp {
-            op,
-            arg: Box::new(arg),
+impl fmt::Display for TopLevelItem {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Expression(expr) => write!(f, "{expr}"),
+            Self::Assignment { name, body } => write!(f, "{name} = {body}"),
+            // Self::FunctionDef { name, args, body } => write!(f, "{name}{args} = {body}"),
         }
     }
+}
+impl Expr {
+    pub fn un_op(op: UnaryOp, arg: Self) -> Self {
+        let arg = Box::new(arg);
+        Self::UnOp { op, arg }
+    }
     pub fn bin_op(op: BinaryOp, left: Self, right: Self) -> Self {
-        Self::BinOp {
-            op,
-            left: Box::new(left),
-            right: Box::new(right),
-        }
+        let left = Box::new(left);
+        let right = Box::new(right);
+        Self::BinOp { op, left, right }
     }
 }
 
@@ -168,17 +221,8 @@ impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Lit(x) => write!(f, "{x}"),
-            Self::Variable(s) => f.write_str(s),
-            Self::Call { func, arg, args } => {
-                func.fmt(f)?;
-                f.write_str("(")?;
-                arg.fmt(f)?;
-                for arg in args.iter() {
-                    f.write_str(" ,")?;
-                    arg.fmt(f)?;
-                }
-                f.write_str(")")
-            }
+            Self::Variable(s) => write!(f, "{s}"),
+            // Self::Call { func, args } => write!(f, "{func}{args}"),
             Self::UnOp { op, arg } => match op {
                 UnaryOp::Negate => write!(f, "-{arg}"),
                 UnaryOp::Plus => write!(f, "+{arg}"),
@@ -215,5 +259,15 @@ impl fmt::Display for Expr {
                 }
             }
         }
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for ArgList<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}", self.head)?;
+        for arg in self.tail.iter() {
+            write!(f, ", {arg}")?;
+        }
+        write!(f, ")")
     }
 }

@@ -2,75 +2,6 @@ use std::fmt;
 
 use ecow::EcoString;
 
-// #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-// pub enum Operator {
-//     Equals,
-//     Plus,
-//     Minus,
-//     Dot,
-//     Slash,
-// }
-
-// impl fmt::Display for Operator {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         use Operator::*;
-//         write!(
-//             f,
-//             "{}",
-//             match self {
-//                 Equals => "=",
-//                 Plus => "+",
-//                 Minus => "-",
-//                 Dot => "*",
-//                 Slash => "/",
-//             }
-//         )
-//     }
-// }
-
-// #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-// pub enum BracketSide {
-//     Left,
-//     Right,
-// }
-
-// #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-// pub enum BracketKind {
-//     Paren,
-// }
-
-// #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-// pub struct Bracket {
-//     side: BracketSide,
-//     kind: BracketKind,
-// }
-
-// impl Bracket {
-//     const LEFT_PAREN: Self = Self {
-//         side: BracketSide::Left,
-//         kind: BracketKind::Paren,
-//     };
-//     const RIGHT_PAREN: Self = Self {
-//         side: BracketSide::Right,
-//         kind: BracketKind::Paren,
-//     };
-// }
-
-// impl fmt::Display for Bracket {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         use BracketKind::*;
-//         use BracketSide::*;
-//         write!(
-//             f,
-//             "{}",
-//             match (self.side, self.kind) {
-//                 (Left, Paren) => "(",
-//                 (Right, Paren) => ")",
-//             }
-//         )
-//     }
-// }
-
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Token {
     Ident(EcoString),
@@ -87,28 +18,8 @@ pub enum Token {
     Slash,
 }
 
-// impl From<Operator> for Token<'_> {
-//     fn from(op: Operator) -> Token<'static> {
-//         Token::Op(op)
-//     }
-// }
-
-// impl From<Bracket> for Token<'_> {
-//     fn from(bracket: Bracket) -> Token<'static> {
-//         Token::Bracket(bracket)
-//     }
-// }
-
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // match self {
-        //     Ident(i) => write!(f, "{i}"),
-        //     NumLit(l) => write!(f, "{l}"),
-        //     Op(o) => write!(f, "{o}"),
-        //     Bracket(b) => write!(f, "{b}"),
-        //     Newline => write!(f, "\\n"),
-        //     // Whitespace => write!(f, "\\s"),
-        // }
         f.write_str(match self {
             Self::Ident(s) | Self::NumLit(s) => s,
             Self::Newline => "\\n",
@@ -198,7 +109,10 @@ impl<'a> Lexer<'a> {
     }
 
     fn run(mut self) -> Result<Vec<Token>, String> {
-        self.next_char_while(char::is_ascii_whitespace);
+        fn is_whitespace(c: &char) -> bool {
+            c.is_ascii_whitespace() && !"\r\n".contains(*c)
+        }
+        self.next_char_while(is_whitespace);
 
         while let (start, Some(c)) = (self.pos, self.next_char()) {
             let token = match c {
@@ -227,11 +141,10 @@ impl<'a> Lexer<'a> {
                         Token::Dot
                     }
                 }
-                _ => Err(format!("Unexpected start of token '{c}'"))?,
+                _ => Err(format!("Unexpected start of token {c:?}"))?,
             };
-            println!("lex -- read {token:?}");
             self.tokens.push(token);
-            self.next_char_while(char::is_ascii_whitespace);
+            self.next_char_while(is_whitespace);
         }
 
         Ok(self.tokens)
