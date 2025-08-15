@@ -144,9 +144,9 @@ impl<'a> Lexer<'a> {
         self.input[self.pos..].chars().next()
     }
 
-    fn next_char_if(&mut self, f: impl Fn(char) -> bool) -> Option<char> {
+    fn next_char_if(&mut self, f: impl Fn(&char) -> bool) -> Option<char> {
         let c = self.peek_char()?;
-        if f(c) {
+        if f(&c) {
             self.pos += 1;
             Some(c)
         } else {
@@ -159,10 +159,10 @@ impl<'a> Lexer<'a> {
     }
 
     fn next_char_exact(&mut self, c: char) -> bool {
-        self.next_char_if(|next| next == c).is_some()
+        self.next_char_if(|&next| next == c).is_some()
     }
 
-    fn one_or_more_greedy(&mut self, f: impl Fn(char) -> bool) -> bool {
+    fn one_or_more_greedy(&mut self, f: impl Fn(&char) -> bool) -> bool {
         let mut found = false;
         while self.next_char_if(&f).is_some() {
             found = true;
@@ -170,12 +170,12 @@ impl<'a> Lexer<'a> {
         found
     }
 
-    fn next_char_while(&mut self, f: impl Fn(char) -> bool) {
+    fn next_char_while(&mut self, f: impl Fn(&char) -> bool) {
         self.one_or_more_greedy(f);
     }
 
     fn read_digits(&mut self) -> bool {
-        self.one_or_more_greedy(|c| c.is_ascii_digit())
+        self.one_or_more_greedy(char::is_ascii_digit)
     }
 
     fn read_number_unsigned(&mut self) -> bool {
@@ -198,7 +198,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn run(mut self) -> Result<Vec<Token>, String> {
-        self.next_char_while(|c| c.is_ascii_whitespace());
+        self.next_char_while(char::is_ascii_whitespace);
 
         while let (start, Some(c)) = (self.pos, self.next_char()) {
             let token = match c {
@@ -212,7 +212,7 @@ impl<'a> Lexer<'a> {
                 '*' => Token::Cdot,
                 '/' => Token::Slash,
                 c if c.is_ascii_alphabetic() => {
-                    self.next_char_while(|c| c.is_ascii_alphabetic());
+                    self.next_char_while(char::is_ascii_alphabetic);
                     Token::Ident(EcoString::from(&self.input[start..self.pos]))
                 }
                 '0'..='9' => {
@@ -231,7 +231,7 @@ impl<'a> Lexer<'a> {
             };
             println!("lex -- read {token:?}");
             self.tokens.push(token);
-            self.next_char_while(|c| c.is_ascii_whitespace());
+            self.next_char_while(char::is_ascii_whitespace);
         }
 
         Ok(self.tokens)

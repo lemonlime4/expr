@@ -37,6 +37,7 @@ impl BinaryOp {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
     Negate,
+    Plus,
 }
 
 #[derive(Debug)]
@@ -77,12 +78,51 @@ impl Parser {
         self.tokens.pop()
     }
 
+    fn next_while<T>(&mut self, mut f: impl FnMut(&Token) -> Option<T>) -> Vec<T> {
+        let mut result = Vec::new();
+        while let Some(processed) = self.peek().and_then(&mut f) {
+            self.next();
+            result.push(processed);
+        }
+        result
+    }
+
+    // fn next_if(&mut self, f: impl Fn(&Token) -> bool) -> Option<Token> {
+    //     if self.peek().is_some_and(f) {
+    //         self.next()
+    //     } else {
+    //         None
+    //     }
+    // }
+
     pub fn parse(&mut self, last_op: Option<BinaryOp>) -> Result<Expr, String> {
+        println!("parsing {:?}", self.tokens);
+        // let negated = self.next_if(|t| *t == Token::Minus).is_some();
+        let signs = self.next_while(|t| match t {
+            Token::Minus => Some(true),
+            Token::Plus => Some(false),
+            _ => None,
+        });
         let mut left = match self.next() {
+            Some(Token::LeftParen) => {
+                let inner = self.parse(None)?;
+                if self.next() != Some(Token::RightParen) {
+                    Err("Expected )")?;
+                }
+                inner
+            }
             Some(Token::NumLit(s)) => Expr::Lit(s.parse().expect("Failed to parse float literal")),
             Some(Token::Ident(name)) => Expr::Variable(name),
-            _ => Err("cannot parse empty expression")?,
+            Some(t) => Err(format!("unknown token {t:?}"))?,
+            None => Err("cannot parse empty expression")?,
         };
+        for sign in signs {
+            let op = match sign {
+                true => UnaryOp::Negate,
+                false => UnaryOp::Plus,
+            };
+            left = Expr::un_op(op, left);
+        }
         loop {
             let op = match self.peek() {
                 Some(Token::Plus) => BinaryOp::Add,
@@ -109,7 +149,13 @@ pub fn parse(input: &str) -> Result<Expr, String> {
 }
 
 impl Expr {
-    pub fn bin_op(op: BinaryOp, left: Expr, right: Expr) -> Self {
+    pub fn un_op(op: UnaryOp, arg: Self) -> Self {
+        Self::UnOp {
+            op,
+            arg: Box::new(arg),
+        }
+    }
+    pub fn bin_op(op: BinaryOp, left: Self, right: Self) -> Self {
         Self::BinOp {
             op,
             left: Box::new(left),
@@ -135,6 +181,7 @@ impl fmt::Display for Expr {
             }
             Self::UnOp { op, arg } => match op {
                 UnaryOp::Negate => write!(f, "-{arg}"),
+                UnaryOp::Plus => write!(f, "+{arg}"),
             },
             Self::BinOp { op, left, right } => {
                 // if *op == Op::Multiply {
