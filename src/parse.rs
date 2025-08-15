@@ -159,6 +159,10 @@ impl Parser {
     pub fn parse(&mut self) -> Result<Vec<TopLevelItem>, String> {
         let mut items = Vec::new();
         loop {
+            if self.peek().is_none() {
+                break;
+            }
+
             // println!("parsing item {:?}", self.tokens);
             let mut assigned_name = None;
             if matches!(self.tokens.as_slice(), [.., Token::Equals, Token::Ident(_)]) {
@@ -180,9 +184,6 @@ impl Parser {
                 Some(Token::Newline) => {
                     while self.peek() == Some(&Token::Newline) {
                         self.next();
-                    }
-                    if self.peek().is_none() {
-                        break;
                     }
                 }
                 None => break,
