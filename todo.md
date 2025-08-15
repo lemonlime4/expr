@@ -1,0 +1,4 @@
+- add functions
+- better (order independent) name resolution
+- graphing
+- point and list types
