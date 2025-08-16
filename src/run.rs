@@ -1,13 +1,15 @@
 use std::{collections::HashMap, hash::Hash};
 
-use crate::parse::{BinaryOp, Expr, Ident, TopLevelItem, UnaryOp};
+use crate::parse::{ArgList, BinaryOp, Expr, Ident, TopLevelItem, UnaryOp};
 
-// fn resolve_dependencies(expr: &Expr) -> Vec<Ident> {
-
-// }
+#[derive(Clone)]
+enum Binding {
+    Value(f64),
+    Function { args: ArgList<Ident>, body: Expr },
+}
 
 pub struct Interpreter {
-    bindings: HashMap<Ident, f64>,
+    bindings: HashMap<Ident, Binding>,
     results: Vec<f64>,
 }
 
@@ -27,27 +29,82 @@ impl Interpreter {
     }
 
     fn add_item(&mut self, item: TopLevelItem) -> Result<(), String> {
+        println!("running {item}");
         match item {
             TopLevelItem::Expression(expr) => {
-                self.results.push(self.evaluate(&expr)?);
+                let value = self.evaluate(&expr)?;
+                self.results.push(value);
             }
             TopLevelItem::Assignment { name, body } => {
                 //
                 if self.bindings.contains_key(&name) {
-                    Err(format!("Cannot bind {name} twice"))?;
+                    Err(format!(
+                        "Cannot define variable '{name}' as this name is already bound"
+                    ))?;
                 }
-                self.bindings.insert(name, self.evaluate(&body)?);
+                let value = self.evaluate(&body)?;
+                self.bindings.insert(name, Binding::Value(value));
+            }
+            TopLevelItem::FunctionDef { name, args, body } => {
+                //
+                if self.bindings.contains_key(&name) {
+                    Err(format!(
+                        "Cannot define function '{name}' as this name is already bound"
+                    ))?;
+                }
+                for arg in args.iter() {
+                    if self.bindings.contains_key(arg) {
+                        Err(format!(
+                            "Cannot use argument '{arg}' as this name is already bound"
+                        ))?
+                    }
+                }
+                self.bindings.insert(name, Binding::Function { args, body });
             }
         }
         Ok(())
     }
 
-    fn evaluate(&self, expr: &Expr) -> Result<f64, String> {
+    // TODO 1 remove the mut and change bindings to RefCell
+    fn evaluate(&mut self, expr: &Expr) -> Result<f64, String> {
         Ok(match expr {
             Expr::Lit(x) => *x,
             Expr::Variable(name) => match self.bindings.get(name) {
-                Some(x) => *x,
-                None => Err(format!("No binding {name} found"))?,
+                Some(Binding::Value(x)) => *x,
+                Some(Binding::Function { .. }) => {
+                    Err(format!("'{name}' is a function and not a variable"))?
+                }
+                None => Err(format!("Binding '{name}' not defined"))?,
+            },
+            Expr::Call { func, args } => match self.bindings.clone().get(func) {
+                Some(Binding::Function {
+                    args: arg_names,
+                    body,
+                }) => {
+                    if arg_names.len() != args.len() {
+                        Err(format!(
+                            "Cannot pass {} arguments to a function taking {} arguments",
+                            args.len(),
+                            arg_names.len(),
+                        ))?;
+                    }
+
+                    for (arg_name, arg) in std::iter::zip(arg_names.iter(), args.iter()) {
+                        let evaluated = self.evaluate(arg)?;
+                        // TODO 1 mutable access here
+                        self.bindings
+                            .insert(arg_name.clone(), Binding::Value(evaluated));
+                    }
+                    let result = self.evaluate(body)?;
+                    for arg_name in arg_names.iter() {
+                        self.bindings.remove(arg_name).unwrap();
+                    }
+                    result
+                }
+                Some(Binding::Value(x)) => {
+                    Err(format!("Cannot call '{func}' as it is not a function"))?
+                }
+                None => Err(format!("Function '{func}' not defined"))?,
             },
             Expr::UnOp { op, arg } => {
                 let arg = self.evaluate(arg)?;

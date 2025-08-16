@@ -8,20 +8,21 @@ use notify::{Event, RecursiveMode, Watcher, recommended_watcher};
 use notify_debouncer_full::{DebounceEventResult, new_debouncer, notify};
 
 use crate::{
-    parse::{BinaryOp, Expr, parse},
+    parse::{ArgList, BinaryOp, Expr, parse},
     run::Interpreter,
 };
 
 fn main() {
     let (send, recv) = mpsc::channel();
     let mut debouncer = new_debouncer(Duration::from_millis(100), None, send).unwrap();
-    if debouncer
-        .watch("./input.txt", RecursiveMode::NonRecursive)
-        .is_err()
-    {
+    if let Err(err) = debouncer.watch("./input.txt", RecursiveMode::NonRecursive) {
         println!("`input.txt` was not found in current directory");
+        println!("{err:?}");
         return;
     }
+
+    use parse::example_fn;
+    println!("{}", example_fn());
 
     // repl
     loop {

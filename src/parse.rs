@@ -1,9 +1,11 @@
 use std::{
     cmp::{self, Ordering},
     fmt::{self, Binary},
+    hint::unreachable_unchecked,
+    slice,
 };
 
-use ecow::{EcoString, EcoVec};
+use ecow::EcoString;
 
 use crate::lex::{Token, lex};
 
@@ -37,14 +39,14 @@ pub enum UnaryOp {
     Plus,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Lit(f64),
     Variable(Ident),
-    // Call {
-    //     func: Ident,
-    //     args: ArgList<Box<Expr>>,
-    // },
+    Call {
+        func: Ident,
+        args: ArgList<Box<Expr>>,
+    },
     UnOp {
         op: UnaryOp,
         arg: Box<Expr>,
@@ -58,18 +60,21 @@ pub enum Expr {
 
 pub enum TopLevelItem {
     Expression(Expr),
-    Assignment { name: Ident, body: Expr },
-    // FunctionDef {
-    //     name: Ident,
-    //     args: ArgList<Ident>,
-    //     body: Expr,
-    // },
+    Assignment {
+        name: Ident,
+        body: Expr,
+    },
+    FunctionDef {
+        name: Ident,
+        args: ArgList<Ident>,
+        body: Expr,
+    },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ArgList<T> {
-    head: T,
-    tail: Vec<T>,
+    pub head: T,
+    pub tail: Vec<T>,
 }
 
 struct Parser {
@@ -107,12 +112,8 @@ impl Parser {
         result
     }
 
-    pub fn parse_expr(
-        &mut self,
-        last_op: Option<BinaryOp>,
-        skip_newlines: bool,
-    ) -> Result<Expr, String> {
-        // println!("parsing expr {:?}", self.tokens);
+    pub fn parse_expr(&mut self, last_op: Option<BinaryOp>) -> Result<Expr, String> {
+        println!("parsing expr {:?}", self.tokens);
         let signs = self.consume_while(|t| match t {
             Token::Minus => Some(true),
             Token::Plus => Some(false),
@@ -120,14 +121,31 @@ impl Parser {
         });
         let mut left = match self.next() {
             Some(Token::LeftParen) => {
-                let inner = self.parse_expr(None, true)?;
+                let inner = self.parse_expr(None)?;
                 if self.next() != Some(Token::RightParen) {
                     Err("Expected )")?;
                 }
                 inner
             }
             Some(Token::NumLit(s)) => Expr::Lit(s.parse().expect("Failed to parse float literal")),
-            Some(Token::Ident(name)) => Expr::Variable(name),
+            Some(Token::Ident(name)) => match self.peek() {
+                Some(Token::LeftParen) => {
+                    // TODO parse comma separated list
+                    self.next();
+                    let arg = self.parse_expr(None)?;
+                    if self.next() != Some(Token::RightParen) {
+                        Err("Expected )")?;
+                    }
+                    Expr::Call {
+                        func: name,
+                        args: ArgList {
+                            head: Box::new(arg),
+                            tail: Vec::new(),
+                        },
+                    }
+                }
+                _ => Expr::Variable(name),
+            },
             Some(t) => Err(format!("unknown token {t:?}"))?,
             None => Err("cannot parse empty expression")?,
         };
@@ -148,11 +166,53 @@ impl Parser {
             };
             if Some(op.binding_power()) > last_op.map(|op| op.binding_power()) {
                 self.next();
-                let right = self.parse_expr(Some(op), false)?;
+                let right = self.parse_expr(Some(op))?;
                 left = Expr::bin_op(op, left, right);
             } else {
                 break Ok(left);
             }
+        }
+    }
+
+    pub fn read_assignment_head(&mut self) -> Option<(Ident, Option<ArgList<Ident>>)> {
+        match self.tokens.as_slice() {
+            [.., Token::Assign, Token::Ident(_)] => {
+                let name = match self.next().unwrap() {
+                    Token::Ident(name) => name,
+                    _ => unreachable!(),
+                };
+                self.next();
+                Some((name, None))
+            }
+            [
+                ..,
+                Token::Assign,
+                Token::RightParen,
+                Token::Ident(_),
+                Token::LeftParen,
+                Token::Ident(_),
+            ] => {
+                let name = match self.next().unwrap() {
+                    Token::Ident(name) => name,
+                    _ => unreachable!(),
+                };
+                self.next();
+                let arg = match self.next().unwrap() {
+                    Token::Ident(name) => name,
+                    _ => unreachable!(),
+                };
+                self.next();
+                self.next();
+
+                Some((
+                    name,
+                    Some(ArgList {
+                        head: arg,
+                        tail: Vec::new(),
+                    }),
+                ))
+            }
+            _ => None,
         }
     }
 
@@ -163,21 +223,17 @@ impl Parser {
                 break;
             }
 
+            // parse top level item
             // println!("parsing item {:?}", self.tokens);
-            let mut assigned_name = None;
-            if matches!(self.tokens.as_slice(), [.., Token::Equals, Token::Ident(_)]) {
-                let ident = self.next().unwrap();
-                self.next();
-                assigned_name = Some(match ident {
-                    Token::Ident(name) => name,
-                    _ => unreachable!(),
-                })
-            }
 
-            let expr = self.parse_expr(None, false)?;
+            let assigned_name = self.read_assignment_head();
+            println!("-- {:?}", self.tokens);
+
+            let body = self.parse_expr(None)?;
             items.push(match assigned_name {
-                Some(name) => TopLevelItem::Assignment { name, body: expr },
-                None => TopLevelItem::Expression(expr),
+                Some((name, Some(args))) => TopLevelItem::FunctionDef { name, args, body },
+                Some((name, None)) => TopLevelItem::Assignment { name, body },
+                None => TopLevelItem::Expression(body),
             });
 
             match self.peek() {
@@ -203,8 +259,8 @@ impl fmt::Display for TopLevelItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Expression(expr) => write!(f, "{expr}"),
-            Self::Assignment { name, body } => write!(f, "{name} = {body}"),
-            // Self::FunctionDef { name, args, body } => write!(f, "{name}{args} = {body}"),
+            Self::Assignment { name, body } => write!(f, "{name} := {body}"),
+            Self::FunctionDef { name, args, body } => write!(f, "{name}{args} := {body}"),
         }
     }
 }
@@ -225,7 +281,7 @@ impl fmt::Display for Expr {
         match self {
             Self::Lit(x) => write!(f, "{x}"),
             Self::Variable(s) => write!(f, "{s}"),
-            // Self::Call { func, args } => write!(f, "{func}{args}"),
+            Self::Call { func, args } => write!(f, "{func}{args}"),
             Self::UnOp { op, arg } => match op {
                 UnaryOp::Negate => write!(f, "-{arg}"),
                 UnaryOp::Plus => write!(f, "+{arg}"),
@@ -265,6 +321,36 @@ impl fmt::Display for Expr {
     }
 }
 
+impl<T> ArgList<T> {
+    pub fn iter(&self) -> ArgListIter<'_, T> {
+        ArgListIter {
+            head: Some(&self.head),
+            tail: self.tail.iter(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        1 + self.tail.len()
+    }
+}
+pub struct ArgListIter<'a, T> {
+    head: Option<&'a T>,
+    tail: slice::Iter<'a, T>,
+}
+
+impl<'a, T> std::iter::Iterator for ArgListIter<'a, T> {
+    type Item = &'a T;
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(head) = self.head {
+            self.head = None;
+            Some(head)
+        } else {
+            self.tail.next()
+        }
+    }
+    // TODO find out if i have to implement more methods
+}
+
 impl<T: fmt::Display> fmt::Display for ArgList<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({}", self.head)?;
@@ -272,5 +358,18 @@ impl<T: fmt::Display> fmt::Display for ArgList<T> {
             write!(f, ", {arg}")?;
         }
         write!(f, ")")
+    }
+}
+
+pub fn example_fn() -> TopLevelItem {
+    TopLevelItem::FunctionDef {
+        name: "f".into(),
+        args: ArgList {
+            head: "x".into(),
+            tail: vec!["y".into(), "z".into()],
+        },
+        body: Parser::new(lex("x * y + z / x / y").unwrap())
+            .parse_expr(None)
+            .unwrap(),
     }
 }
