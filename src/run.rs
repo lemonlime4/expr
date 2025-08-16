@@ -29,7 +29,7 @@ impl Interpreter {
     }
 
     fn add_item(&mut self, item: TopLevelItem) -> Result<(), String> {
-        println!("running {item}");
+        eprintln!("running {item}");
         match item {
             TopLevelItem::Expression(expr) => {
                 let value = self.evaluate(&expr)?;

@@ -21,8 +21,8 @@ fn main() {
         return;
     }
 
-    use parse::example_fn;
-    println!("{}", example_fn());
+    // use parse::example_fn;
+    // eprintln!("{}", example_fn());
 
     // repl
     loop {

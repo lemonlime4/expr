@@ -113,7 +113,7 @@ impl Parser {
     }
 
     pub fn parse_expr(&mut self, last_op: Option<BinaryOp>) -> Result<Expr, String> {
-        println!("parsing expr {:?}", self.tokens);
+        // eprintln!("parsing expr {:?}", self.tokens);
         let signs = self.consume_while(|t| match t {
             Token::Minus => Some(true),
             Token::Plus => Some(false),
@@ -227,7 +227,7 @@ impl Parser {
             // println!("parsing item {:?}", self.tokens);
 
             let assigned_name = self.read_assignment_head();
-            println!("-- {:?}", self.tokens);
+            // eprintln!("-- {:?}", self.tokens);
 
             let body = self.parse_expr(None)?;
             items.push(match assigned_name {
