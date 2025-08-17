@@ -6,6 +6,7 @@
 - add functions
     - figure out how to parse multi arg functions without backtracking
         - make := into an operator and do another step?
+- fix function args shadowing and deleting later bindings
 
 # technical
 - TODO 1 : figure out how to temporarily bind arguments when evaluating functions
