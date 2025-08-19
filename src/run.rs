@@ -10,6 +10,7 @@ enum Binding {
 
 pub struct Interpreter {
     bindings: HashMap<Ident, Binding>,
+    arg_bindings: HashMap<Ident, f64>,
     results: Vec<f64>,
 }
 
@@ -17,6 +18,7 @@ impl Interpreter {
     pub fn new() -> Self {
         Self {
             bindings: HashMap::new(),
+            arg_bindings: HashMap::new(),
             results: Vec::new(),
         }
     }
@@ -32,7 +34,7 @@ impl Interpreter {
         eprintln!("running {item}");
         match item {
             TopLevelItem::Expression(expr) => {
-                let value = self.evaluate(&expr)?;
+                let value = self.evaluate(&expr, &HashMap::new())?;
                 self.results.push(value);
             }
             TopLevelItem::Assignment { name, body } => {
@@ -42,11 +44,10 @@ impl Interpreter {
                         "Cannot define variable '{name}' as this name is already bound"
                     ))?;
                 }
-                let value = self.evaluate(&body)?;
+                let value = self.evaluate(&body, &HashMap::new())?;
                 self.bindings.insert(name, Binding::Value(value));
             }
             TopLevelItem::FunctionDef { name, args, body } => {
-                //
                 if self.bindings.contains_key(&name) {
                     Err(format!(
                         "Cannot define function '{name}' as this name is already bound"
@@ -59,28 +60,32 @@ impl Interpreter {
                         ))?
                     }
                 }
+                // let body = self.pre_evaluate(&args, body);
                 self.bindings.insert(name, Binding::Function { args, body });
             }
         }
         Ok(())
     }
 
-    // TODO 1 remove the mut and change bindings to RefCell
-    fn evaluate(&mut self, expr: &Expr) -> Result<f64, String> {
+    fn evaluate(&self, expr: &Expr, arg_map: &HashMap<Ident, f64>) -> Result<f64, String> {
         Ok(match expr {
             Expr::Lit(x) => *x,
-            Expr::Variable(name) => match self.bindings.get(name) {
-                Some(Binding::Value(x)) => *x,
-                Some(Binding::Function { .. }) => {
-                    Err(format!("'{name}' is a function and not a variable"))?
-                }
-                None => Err(format!("Binding '{name}' not defined"))?,
+            Expr::Variable(name) => match arg_map.get(name) {
+                Some(x) => *x,
+                None => match self.bindings.get(name) {
+                    Some(Binding::Value(x)) => *x,
+                    Some(Binding::Function { .. }) => {
+                        Err(format!("'{name}' is a function and not a variable"))?
+                    }
+                    None => Err(format!("Binding '{name}' not defined"))?,
+                },
             },
-            Expr::Call { func, args } => match self.bindings.clone().get(func) {
+            Expr::Call { func, args } => match self.bindings.get(func) {
                 Some(Binding::Function {
                     args: arg_names,
                     body,
                 }) => {
+                    // eprintln!("evaluating {func}");
                     if arg_names.len() != args.len() {
                         Err(format!(
                             "Cannot pass {} arguments to a function taking {} arguments",
@@ -89,16 +94,14 @@ impl Interpreter {
                         ))?;
                     }
 
+                    let mut new_arg_map = HashMap::new();
                     for (arg_name, arg) in std::iter::zip(arg_names.iter(), args.iter()) {
-                        let evaluated = self.evaluate(arg)?;
-                        // TODO 1 mutable access here
-                        self.bindings
-                            .insert(arg_name.clone(), Binding::Value(evaluated));
+                        let evaluated = self.evaluate(arg, arg_map)?;
+                        new_arg_map.insert(arg_name.clone(), evaluated);
                     }
-                    let result = self.evaluate(body)?;
-                    for arg_name in arg_names.iter() {
-                        self.bindings.remove(arg_name).unwrap();
-                    }
+                    let result = self.evaluate(body, &new_arg_map)?;
+
+                    // eprintln!("done evaluating {func}");
                     result
                 }
                 Some(Binding::Value(x)) => {
@@ -107,15 +110,15 @@ impl Interpreter {
                 None => Err(format!("Function '{func}' not defined"))?,
             },
             Expr::UnOp { op, arg } => {
-                let arg = self.evaluate(arg)?;
+                let arg = self.evaluate(arg, arg_map)?;
                 match op {
                     UnaryOp::Negate => -arg,
                     UnaryOp::Plus => arg,
                 }
             }
             Expr::BinOp { op, left, right } => {
-                let left = self.evaluate(left)?;
-                let right = self.evaluate(right)?;
+                let left = self.evaluate(left, arg_map)?;
+                let right = self.evaluate(right, arg_map)?;
                 match op {
                     BinaryOp::Add => left + right,
                     BinaryOp::Subtract => left - right,

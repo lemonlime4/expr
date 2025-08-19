@@ -10,6 +10,7 @@ pub enum Token {
     Assign,
     LeftParen,
     RightParen,
+    Comma,
     Dot,
 
     Plus,
@@ -25,6 +26,7 @@ impl fmt::Display for Token {
             Self::Newline => "\\n",
             Self::LeftParen => "(",
             Self::RightParen => ")",
+            Self::Comma => ",",
             Self::Dot => ".",
             Self::Assign => ":=",
             Self::Plus => "+",
@@ -121,6 +123,7 @@ impl<'a> Lexer<'a> {
                 ':' if self.next_char_exact('=') => Token::Assign,
                 ')' => Token::RightParen,
                 '(' => Token::LeftParen,
+                ',' => Token::Comma,
                 '+' => Token::Plus,
                 '-' => Token::Minus,
                 '*' => Token::Cdot,
@@ -141,7 +144,7 @@ impl<'a> Lexer<'a> {
                         Token::Dot
                     }
                 }
-                _ => Err(format!("Unexpected start of token {c:?}"))?,
+                _ => Err(format!("Unknown character {c:?}"))?,
             };
             self.tokens.push(token);
             self.next_char_while(is_whitespace);

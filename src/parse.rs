@@ -5,7 +5,7 @@ use std::{
     slice,
 };
 
-use ecow::EcoString;
+use ecow::{EcoString, EcoVec, eco_vec};
 
 use crate::lex::{Token, lex};
 
@@ -45,7 +45,7 @@ pub enum Expr {
     Variable(Ident),
     Call {
         func: Ident,
-        args: ArgList<Box<Expr>>,
+        args: ArgList<Expr>,
     },
     UnOp {
         op: UnaryOp,
@@ -72,10 +72,7 @@ pub enum TopLevelItem {
 }
 
 #[derive(Debug, Clone)]
-pub struct ArgList<T> {
-    pub head: T,
-    pub tail: Vec<T>,
-}
+pub struct ArgList<T>(Vec<T>);
 
 struct Parser {
     tokens: Vec<Token>,
@@ -122,27 +119,28 @@ impl Parser {
         let mut left = match self.next() {
             Some(Token::LeftParen) => {
                 let inner = self.parse_expr(None)?;
-                if self.next() != Some(Token::RightParen) {
-                    Err("Expected )")?;
+                match self.next() {
+                    Some(Token::RightParen) => {}
+                    Some(token) => Err(format!("{token} is not allowed here"))?,
+                    None => Err("Unclosed parenthesis")?,
                 }
                 inner
             }
             Some(Token::NumLit(s)) => Expr::Lit(s.parse().expect("Failed to parse float literal")),
             Some(Token::Ident(name)) => match self.peek() {
                 Some(Token::LeftParen) => {
-                    // TODO parse comma separated list
                     self.next();
-                    let arg = self.parse_expr(None)?;
-                    if self.next() != Some(Token::RightParen) {
-                        Err("Expected )")?;
+                    let mut args = ArgList::from_head(self.parse_expr(None)?);
+                    loop {
+                        match self.next() {
+                            Some(Token::RightParen) => break,
+                            Some(Token::Comma) => {}
+                            Some(token) => Err(format!("Expected comma but got {token}"))?,
+                            None => Err("Unclosed parenthesis")?,
+                        }
+                        args.push(self.parse_expr(None)?);
                     }
-                    Expr::Call {
-                        func: name,
-                        args: ArgList {
-                            head: Box::new(arg),
-                            tail: Vec::new(),
-                        },
-                    }
+                    Expr::Call { func: name, args }
                 }
                 _ => Expr::Variable(name),
             },
@@ -174,48 +172,6 @@ impl Parser {
         }
     }
 
-    pub fn read_assignment_head(&mut self) -> Option<(Ident, Option<ArgList<Ident>>)> {
-        match self.tokens.as_slice() {
-            [.., Token::Assign, Token::Ident(_)] => {
-                let name = match self.next().unwrap() {
-                    Token::Ident(name) => name,
-                    _ => unreachable!(),
-                };
-                self.next();
-                Some((name, None))
-            }
-            [
-                ..,
-                Token::Assign,
-                Token::RightParen,
-                Token::Ident(_),
-                Token::LeftParen,
-                Token::Ident(_),
-            ] => {
-                let name = match self.next().unwrap() {
-                    Token::Ident(name) => name,
-                    _ => unreachable!(),
-                };
-                self.next();
-                let arg = match self.next().unwrap() {
-                    Token::Ident(name) => name,
-                    _ => unreachable!(),
-                };
-                self.next();
-                self.next();
-
-                Some((
-                    name,
-                    Some(ArgList {
-                        head: arg,
-                        tail: Vec::new(),
-                    }),
-                ))
-            }
-            _ => None,
-        }
-    }
-
     pub fn parse(&mut self) -> Result<Vec<TopLevelItem>, String> {
         let mut items = Vec::new();
         loop {
@@ -226,11 +182,58 @@ impl Parser {
             // parse top level item
             // println!("parsing item {:?}", self.tokens);
 
-            let assigned_name = self.read_assignment_head();
-            // eprintln!("-- {:?}", self.tokens);
+            let assignment = if let Some(pos) = self
+                .tokens
+                .iter()
+                .rev()
+                .take_while(|t| **t != Token::Newline)
+                .position(|t| *t == Token::Assign)
+            {
+                let mut tokens = self.tokens.drain(self.tokens.len() - pos..).rev();
+                // println!("{:?}", tokens.collect::<Vec<_>>());
+                let name = match tokens.next() {
+                    Some(Token::Ident(name)) => name,
+                    Some(token) => Err(format!("Unknown token {token} in assignment"))?,
+                    None => Err("Empty assignment")?,
+                };
+                let args = match tokens.next() {
+                    Some(Token::LeftParen) => {
+                        let mut args = ArgList::from_head(match tokens.next() {
+                            Some(Token::Ident(name)) => name,
+                            Some(token) => Err("Unexpected token {token} in argument list")?,
+                            None => Err("Unclosed argument list")?,
+                        });
+                        loop {
+                            match tokens.next() {
+                                Some(Token::Comma) => {}
+                                Some(Token::RightParen) => break,
+                                Some(token) => {
+                                    Err(format!("Unknown token {token} in argument list"))?
+                                }
+                                None => Err("Unclosed argument list")?,
+                            }
+                            match tokens.next() {
+                                Some(Token::Ident(name)) => args.push(name),
+                                Some(token) => Err(format!("Expected parameter but got {token}"))?,
+                                None => Err("Unclosed argument list")?,
+                            }
+                        }
+                        Some(args)
+                    }
+                    Some(token) => Err(format!("Unknown token {token} in assignment"))?,
+                    None => None,
+                };
+                drop(tokens);
+                assert_eq!(Some(Token::Assign), self.tokens.pop()); // pop Token::Assign
+                Some((name, args))
+            } else {
+                None
+            };
 
+            // eprintln!("parsed assignment {assignment:?}");
+            // eprintln!("parsing body {:?}", self.tokens);
             let body = self.parse_expr(None)?;
-            items.push(match assigned_name {
+            items.push(match assignment {
                 Some((name, Some(args))) => TopLevelItem::FunctionDef { name, args, body },
                 Some((name, None)) => TopLevelItem::Assignment { name, body },
                 None => TopLevelItem::Expression(body),
@@ -260,7 +263,7 @@ impl fmt::Display for TopLevelItem {
         match self {
             Self::Expression(expr) => write!(f, "{expr}"),
             Self::Assignment { name, body } => write!(f, "{name} := {body}"),
-            Self::FunctionDef { name, args, body } => write!(f, "{name}{args} := {body}"),
+            Self::FunctionDef { name, args, body } => write!(f, "{name}({args}) := {body}"),
         }
     }
 }
@@ -281,7 +284,7 @@ impl fmt::Display for Expr {
         match self {
             Self::Lit(x) => write!(f, "{x}"),
             Self::Variable(s) => write!(f, "{s}"),
-            Self::Call { func, args } => write!(f, "{func}{args}"),
+            Self::Call { func, args } => write!(f, "{func}({args})"),
             Self::UnOp { op, arg } => match op {
                 UnaryOp::Negate => write!(f, "-{arg}"),
                 UnaryOp::Plus => write!(f, "+{arg}"),
@@ -322,54 +325,28 @@ impl fmt::Display for Expr {
 }
 
 impl<T> ArgList<T> {
-    pub fn iter(&self) -> ArgListIter<'_, T> {
-        ArgListIter {
-            head: Some(&self.head),
-            tail: self.tail.iter(),
-        }
+    pub fn from_head(head: T) -> Self {
+        Self(vec![head])
     }
-
-    pub fn len(&self) -> usize {
-        1 + self.tail.len()
+    pub fn push(&mut self, value: T) {
+        self.0.push(value)
     }
 }
-pub struct ArgListIter<'a, T> {
-    head: Option<&'a T>,
-    tail: slice::Iter<'a, T>,
-}
 
-impl<'a, T> std::iter::Iterator for ArgListIter<'a, T> {
-    type Item = &'a T;
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(head) = self.head {
-            self.head = None;
-            Some(head)
-        } else {
-            self.tail.next()
-        }
+impl<T> std::ops::Deref for ArgList<T> {
+    type Target = Vec<T>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
-    // TODO find out if i have to implement more methods
 }
 
 impl<T: fmt::Display> fmt::Display for ArgList<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({}", self.head)?;
-        for arg in self.tail.iter() {
+        let mut it = self.0.iter();
+        write!(f, "{}", it.next().unwrap())?;
+        for arg in it {
             write!(f, ", {arg}")?;
         }
-        write!(f, ")")
-    }
-}
-
-pub fn example_fn() -> TopLevelItem {
-    TopLevelItem::FunctionDef {
-        name: "f".into(),
-        args: ArgList {
-            head: "x".into(),
-            tail: vec!["y".into(), "z".into()],
-        },
-        body: Parser::new(lex("x * y + z / x / y").unwrap())
-            .parse_expr(None)
-            .unwrap(),
+        Ok(())
     }
 }
