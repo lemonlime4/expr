@@ -1,4 +1,5 @@
 #![allow(unused)]
+mod builtins;
 mod lex;
 mod parse;
 mod run;

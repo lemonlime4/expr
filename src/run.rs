@@ -1,11 +1,18 @@
 use std::{collections::HashMap, hash::Hash};
 
-use crate::parse::{ArgList, BinaryOp, Expr, Ident, TopLevelItem, UnaryOp};
+use crate::{
+    builtins::BuiltinFunction,
+    parse::{ArgList, BinaryOp, Expr, Ident, TopLevelItem, UnaryOp},
+};
+
+use ecow::EcoString;
+use strum::IntoEnumIterator;
 
 #[derive(Clone)]
 enum Binding {
     Value(f64),
     Function { args: ArgList<Ident>, body: Expr },
+    Builtin(BuiltinFunction),
 }
 
 pub struct Interpreter {
@@ -16,8 +23,15 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
+        let mut bindings = HashMap::new();
+        for builtin in BuiltinFunction::iter() {
+            bindings.insert(
+                EcoString::from(builtin.to_string()),
+                Binding::Builtin(builtin),
+            );
+        }
         Self {
-            bindings: HashMap::new(),
+            bindings,
             arg_bindings: HashMap::new(),
             results: Vec::new(),
         }
@@ -74,13 +88,15 @@ impl Interpreter {
                 Some(x) => *x,
                 None => match self.bindings.get(name) {
                     Some(Binding::Value(x)) => *x,
-                    Some(Binding::Function { .. }) => {
+                    Some(Binding::Function { .. } | Binding::Builtin(_)) => {
                         Err(format!("'{name}' is a function and not a variable"))?
                     }
                     None => Err(format!("Binding '{name}' not defined"))?,
                 },
             },
             Expr::Call { func, args } => match self.bindings.get(func) {
+                Some(Binding::Builtin(builtin)) => Err("Builtin functions not yet implemented")?,
+
                 Some(Binding::Function {
                     args: arg_names,
                     body,
@@ -99,10 +115,7 @@ impl Interpreter {
                         let evaluated = self.evaluate(arg, arg_map)?;
                         new_arg_map.insert(arg_name.clone(), evaluated);
                     }
-                    let result = self.evaluate(body, &new_arg_map)?;
-
-                    // eprintln!("done evaluating {func}");
-                    result
+                    self.evaluate(body, &new_arg_map)?
                 }
                 Some(Binding::Value(x)) => {
                     Err(format!("Cannot call '{func}' as it is not a function"))?

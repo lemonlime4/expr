@@ -130,6 +130,9 @@ impl Parser {
             Some(Token::Ident(name)) => match self.peek() {
                 Some(Token::LeftParen) => {
                     self.next();
+                    if self.peek() == Some(&Token::RightParen) {
+                        Err(format!("Cannot call {name} with no arguments"))?;
+                    }
                     let mut args = ArgList::from_head(self.parse_expr(None)?);
                     loop {
                         match self.next() {
@@ -311,8 +314,14 @@ impl fmt::Display for Expr {
                 };
                 // match (left_bp > bp, right_bp > bp) {
                 match (
-                    matches!(left.as_ref(), Self::Lit(..) | Self::Variable(..)),
-                    matches!(right.as_ref(), Self::Lit(..) | Self::Variable(..)),
+                    matches!(
+                        left.as_ref(),
+                        Self::Lit(..) | Self::Variable(..) | Self::Call { .. }
+                    ),
+                    matches!(
+                        right.as_ref(),
+                        Self::Lit(..) | Self::Variable(..) | Self::Call { .. }
+                    ),
                 ) {
                     (true, true) => write!(f, "{left} {op} {right}"),
                     (true, false) => write!(f, "{left} {op} ({right})"),
