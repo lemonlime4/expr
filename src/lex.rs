@@ -1,5 +1,6 @@
 use std::fmt;
 
+use anyhow::{Result, bail};
 use ecow::EcoString;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -110,7 +111,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn run(mut self) -> Result<Vec<Token>, String> {
+    fn run(mut self) -> Result<Vec<Token>> {
         fn is_whitespace(c: &char) -> bool {
             c.is_ascii_whitespace() && !"\r\n".contains(*c)
         }
@@ -144,7 +145,7 @@ impl<'a> Lexer<'a> {
                         Token::Dot
                     }
                 }
-                _ => Err(format!("Unknown character {c:?}"))?,
+                _ => bail!("Unknown character {c:?}"),
             };
             self.tokens.push(token);
             self.next_char_while(is_whitespace);
@@ -154,6 +155,6 @@ impl<'a> Lexer<'a> {
     }
 }
 
-pub fn lex(input: &str) -> Result<Vec<Token>, String> {
+pub fn lex(input: &str) -> Result<Vec<Token>> {
     Lexer::new(input).run()
 }

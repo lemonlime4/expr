@@ -5,6 +5,7 @@ use std::{
     slice,
 };
 
+use anyhow::{Result, bail};
 use ecow::{EcoString, EcoVec, eco_vec};
 
 use crate::lex::{Token, lex};
@@ -109,7 +110,7 @@ impl Parser {
         result
     }
 
-    pub fn parse_expr(&mut self, last_op: Option<BinaryOp>) -> Result<Expr, String> {
+    pub fn parse_expr(&mut self, last_op: Option<BinaryOp>) -> Result<Expr> {
         // eprintln!("parsing expr {:?}", self.tokens);
         let signs = self.consume_while(|t| match t {
             Token::Minus => Some(true),
@@ -121,8 +122,8 @@ impl Parser {
                 let inner = self.parse_expr(None)?;
                 match self.next() {
                     Some(Token::RightParen) => {}
-                    Some(token) => Err(format!("{token} is not allowed here"))?,
-                    None => Err("Unclosed parenthesis")?,
+                    Some(token) => bail!("{token} is not allowed here"),
+                    None => bail!("Unclosed parenthesis"),
                 }
                 inner
             }
@@ -131,15 +132,15 @@ impl Parser {
                 Some(Token::LeftParen) => {
                     self.next();
                     if self.peek() == Some(&Token::RightParen) {
-                        Err(format!("Cannot call {name} with no arguments"))?;
+                        bail!("Cannot call {name} with no arguments");
                     }
                     let mut args = ArgList::from_head(self.parse_expr(None)?);
                     loop {
                         match self.next() {
                             Some(Token::RightParen) => break,
                             Some(Token::Comma) => {}
-                            Some(token) => Err(format!("Expected comma but got {token}"))?,
-                            None => Err("Unclosed parenthesis")?,
+                            Some(token) => bail!("Expected comma but got {token}"),
+                            None => bail!("Unclosed parenthesis"),
                         }
                         args.push(self.parse_expr(None)?);
                     }
@@ -147,8 +148,8 @@ impl Parser {
                 }
                 _ => Expr::Variable(name),
             },
-            Some(t) => Err(format!("unknown token {t:?}"))?,
-            None => Err("cannot parse empty expression")?,
+            Some(t) => bail!("unknown token {t:?}"),
+            None => bail!("cannot parse empty expression"),
         };
         for sign in signs {
             let op = match sign {
@@ -175,7 +176,7 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Vec<TopLevelItem>, String> {
+    pub fn parse(&mut self) -> Result<Vec<TopLevelItem>> {
         let mut items = Vec::new();
         loop {
             if self.peek().is_none() {
@@ -196,34 +197,32 @@ impl Parser {
                 // println!("{:?}", tokens.collect::<Vec<_>>());
                 let name = match tokens.next() {
                     Some(Token::Ident(name)) => name,
-                    Some(token) => Err(format!("Unknown token {token} in assignment"))?,
-                    None => Err("Empty assignment")?,
+                    Some(token) => bail!("Unknown token {token} in assignment"),
+                    None => bail!("Empty assignment"),
                 };
                 let args = match tokens.next() {
                     Some(Token::LeftParen) => {
                         let mut args = ArgList::from_head(match tokens.next() {
                             Some(Token::Ident(name)) => name,
-                            Some(token) => Err("Unexpected token {token} in argument list")?,
-                            None => Err("Unclosed argument list")?,
+                            Some(token) => bail!("Unexpected token {token} in argument list"),
+                            None => bail!("Unclosed argument list"),
                         });
                         loop {
                             match tokens.next() {
                                 Some(Token::Comma) => {}
                                 Some(Token::RightParen) => break,
-                                Some(token) => {
-                                    Err(format!("Unknown token {token} in argument list"))?
-                                }
-                                None => Err("Unclosed argument list")?,
+                                Some(token) => bail!("Unknown token {token} in argument list"),
+                                None => bail!("Unclosed argument list"),
                             }
                             match tokens.next() {
                                 Some(Token::Ident(name)) => args.push(name),
-                                Some(token) => Err(format!("Expected parameter but got {token}"))?,
-                                None => Err("Unclosed argument list")?,
+                                Some(token) => bail!("Expected parameter but got {token}"),
+                                None => bail!("Unclosed argument list"),
                             }
                         }
                         Some(args)
                     }
-                    Some(token) => Err(format!("Unknown token {token} in assignment"))?,
+                    Some(token) => bail!("Unknown token {token} in assignment"),
                     None => None,
                 };
                 drop(tokens);
@@ -249,14 +248,14 @@ impl Parser {
                     }
                 }
                 None => break,
-                Some(t) => Err(format!("Expected newline but got {t}"))?,
+                Some(t) => bail!("Expected newline but got {t}"),
             }
         }
         Ok(items)
     }
 }
 
-pub fn parse(input: &str) -> Result<Vec<TopLevelItem>, String> {
+pub fn parse(input: &str) -> Result<Vec<TopLevelItem>> {
     let tokens = lex(input)?;
     Parser::new(tokens).parse()
 }

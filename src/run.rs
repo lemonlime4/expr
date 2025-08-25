@@ -5,20 +5,23 @@ use crate::{
     parse::{ArgList, BinaryOp, Expr, Ident, TopLevelItem, UnaryOp},
 };
 
+use anyhow::{Result, bail};
 use ecow::EcoString;
 use strum::IntoEnumIterator;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 enum Binding {
     Value(f64),
     Function { args: ArgList<Ident>, body: Expr },
     Builtin(BuiltinFunction),
 }
 
+#[derive(Debug)]
 pub struct Interpreter {
     bindings: HashMap<Ident, Binding>,
     arg_bindings: HashMap<Ident, f64>,
-    results: Vec<f64>,
+    pub constants: Vec<(Option<Ident>, f64)>,
+    pub single_var_functions: Vec<(Ident, Expr)>,
 }
 
 impl Interpreter {
@@ -33,55 +36,53 @@ impl Interpreter {
         Self {
             bindings,
             arg_bindings: HashMap::new(),
-            results: Vec::new(),
+            constants: Vec::new(),
+            single_var_functions: Vec::new(),
         }
     }
 
-    pub fn run(mut self, items: Vec<TopLevelItem>) -> Result<Vec<f64>, String> {
+    pub fn run(&mut self, items: Vec<TopLevelItem>) -> Result<()> {
         for item in items {
             self.add_item(item)?;
         }
-        Ok(self.results)
+        Ok(())
     }
 
-    fn add_item(&mut self, item: TopLevelItem) -> Result<(), String> {
-        eprintln!("running {item}");
+    pub fn add_item(&mut self, item: TopLevelItem) -> Result<()> {
+        // eprintln!("running {item}");
         match item {
             TopLevelItem::Expression(expr) => {
                 let value = self.evaluate(&expr, &HashMap::new())?;
-                self.results.push(value);
+                self.constants.push((None, value));
             }
             TopLevelItem::Assignment { name, body } => {
                 //
                 if self.bindings.contains_key(&name) {
-                    Err(format!(
-                        "Cannot define variable '{name}' as this name is already bound"
-                    ))?;
+                    bail!("Cannot define variable '{name}' as this name is already bound");
                 }
                 let value = self.evaluate(&body, &HashMap::new())?;
+                self.constants.push((Some(name.clone()), value));
                 self.bindings.insert(name, Binding::Value(value));
             }
             TopLevelItem::FunctionDef { name, args, body } => {
                 if self.bindings.contains_key(&name) {
-                    Err(format!(
-                        "Cannot define function '{name}' as this name is already bound"
-                    ))?;
+                    bail!("Cannot define function '{name}' as this name is already bound");
                 }
                 for arg in args.iter() {
                     if self.bindings.contains_key(arg) {
-                        Err(format!(
-                            "Cannot use argument '{arg}' as this name is already bound"
-                        ))?
+                        bail!("Cannot use argument '{arg}' as this name is already bound")
                     }
                 }
-                // let body = self.pre_evaluate(&args, body);
+                if let [arg] = args.as_slice() {
+                    self.single_var_functions.push((arg.clone(), body.clone()));
+                }
                 self.bindings.insert(name, Binding::Function { args, body });
             }
         }
         Ok(())
     }
 
-    fn evaluate(&self, expr: &Expr, arg_map: &HashMap<Ident, f64>) -> Result<f64, String> {
+    pub fn evaluate(&self, expr: &Expr, arg_map: &HashMap<Ident, f64>) -> Result<f64> {
         Ok(match expr {
             Expr::Lit(x) => *x,
             Expr::Variable(name) => match arg_map.get(name) {
@@ -89,13 +90,13 @@ impl Interpreter {
                 None => match self.bindings.get(name) {
                     Some(Binding::Value(x)) => *x,
                     Some(Binding::Function { .. } | Binding::Builtin(_)) => {
-                        Err(format!("'{name}' is a function and not a variable"))?
+                        bail!("'{name}' is a function and not a variable")
                     }
-                    None => Err(format!("Binding '{name}' not defined"))?,
+                    None => bail!("Binding '{name}' not defined"),
                 },
             },
             Expr::Call { func, args } => match self.bindings.get(func) {
-                Some(Binding::Builtin(builtin)) => Err("Builtin functions not yet implemented")?,
+                Some(Binding::Builtin(builtin)) => bail!("Builtin functions not yet implemented"),
 
                 Some(Binding::Function {
                     args: arg_names,
@@ -103,11 +104,11 @@ impl Interpreter {
                 }) => {
                     // eprintln!("evaluating {func}");
                     if arg_names.len() != args.len() {
-                        Err(format!(
+                        bail!(
                             "Cannot pass {} arguments to a function taking {} arguments",
                             args.len(),
                             arg_names.len(),
-                        ))?;
+                        );
                     }
 
                     let mut new_arg_map = HashMap::new();
@@ -118,9 +119,9 @@ impl Interpreter {
                     self.evaluate(body, &new_arg_map)?
                 }
                 Some(Binding::Value(x)) => {
-                    Err(format!("Cannot call '{func}' as it is not a function"))?
+                    bail!("Cannot call '{func}' as it is not a function")
                 }
-                None => Err(format!("Function '{func}' not defined"))?,
+                None => bail!("Function '{func}' not defined"),
             },
             Expr::UnOp { op, arg } => {
                 let arg = self.evaluate(arg, arg_map)?;

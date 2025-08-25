@@ -1,7 +1,10 @@
-# notes
-- name resolution of global bindings is done on invocation for function bodies
+- disallow recursive functions
+- factor out viewport <-> screen coordinate transform
+- make errors properly display
+- remove `constants` and `single_var_functions` from `Interpreter`
 
-# design
+- make evaluation (and errors) less dynamically typed
+
 - should juxtaposed multiplication be allowed?
     - function call syntax becomes ambiguous
 
@@ -12,6 +15,5 @@
 - sliders
 - graphing
 - point and list types
-    - arglist formatting shouldn't have ()
 
 - diagnose multiple independent errors at the same time
