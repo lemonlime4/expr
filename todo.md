@@ -3,8 +3,9 @@
 - make errors properly display
 - remove `constants` and `single_var_functions` from `Interpreter`
 
-- make evaluation (and errors) less dynamically typed
 
+- better background grid
+- make evaluation (and errors) less dynamically typed
 - should juxtaposed multiplication be allowed?
     - function call syntax becomes ambiguous
 
