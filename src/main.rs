@@ -15,7 +15,7 @@ use vello::peniko::color::palette;
 use vello::util::{RenderContext, RenderSurface};
 use vello::{AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
-use winit::dpi::LogicalSize;
+use winit::dpi::{LogicalSize, PhysicalPosition, PhysicalSize};
 use winit::event::{DeviceEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::Window;
@@ -236,11 +236,20 @@ fn main() -> Result<()> {
 
 fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
     let attr = Window::default_attributes()
-        .with_inner_size(LogicalSize::new(1044, 800))
         .with_min_inner_size(LogicalSize::new(300, 100))
         .with_resizable(true)
         .with_title("Vello Shapes");
-    Arc::new(event_loop.create_window(attr).unwrap())
+    let mut window = event_loop.create_window(attr).unwrap();
+    let size = window.primary_monitor().unwrap().size();
+    window.set_outer_position(PhysicalPosition {
+        x: size.width / 2,
+        y: 0,
+    });
+    window.request_inner_size(PhysicalSize {
+        width: size.width / 2,
+        height: size.height,
+    });
+    Arc::new(window)
 }
 
 fn create_vello_renderer(render_cx: &RenderContext, surface: &RenderSurface<'_>) -> Renderer {
