@@ -3,9 +3,8 @@
 - make errors properly display
 - remove `constants` and `single_var_functions` from `Interpreter`
 
-
+- optimize x^2 (and add special behavior for fractions?)
 - better background grid
-- make evaluation (and errors) less dynamically typed
 - should juxtaposed multiplication be allowed?
     - function call syntax becomes ambiguous
 

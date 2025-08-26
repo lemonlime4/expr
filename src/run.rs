@@ -19,7 +19,6 @@ enum Binding {
 #[derive(Debug)]
 pub struct Interpreter {
     bindings: HashMap<Ident, Binding>,
-    arg_bindings: HashMap<Ident, f64>,
     pub constants: Vec<(Option<Ident>, f64)>,
     pub single_var_functions: Vec<(Ident, Expr)>,
 }
@@ -35,7 +34,6 @@ impl Interpreter {
         }
         Self {
             bindings,
-            arg_bindings: HashMap::new(),
             constants: Vec::new(),
             single_var_functions: Vec::new(),
         }
@@ -96,7 +94,14 @@ impl Interpreter {
                 },
             },
             Expr::Call { func, args } => match self.bindings.get(func) {
-                Some(Binding::Builtin(builtin)) => bail!("Builtin functions not yet implemented"),
+                Some(Binding::Builtin(builtin)) => {
+                    let head = args.first().unwrap();
+                    let mut evaluated_args = ArgList::from_head(self.evaluate(head, arg_map)?);
+                    for arg in &args[1..] {
+                        evaluated_args.push(self.evaluate(arg, arg_map)?);
+                    }
+                    builtin.call(evaluated_args)?
+                }
 
                 Some(Binding::Function {
                     args: arg_names,
@@ -138,6 +143,7 @@ impl Interpreter {
                     BinaryOp::Subtract => left - right,
                     BinaryOp::DotProduct => left * right,
                     BinaryOp::Divide => left / right,
+                    BinaryOp::Power => left.powf(right),
                 }
             }
         })

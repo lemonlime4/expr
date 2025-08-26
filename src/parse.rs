@@ -16,10 +16,9 @@ pub type Ident = ecow::EcoString;
 pub enum BinaryOp {
     Add,
     Subtract,
-    // Multiply,
     DotProduct,
-    // CrossProduct,
     Divide,
+    Power,
 }
 
 impl BinaryOp {
@@ -27,9 +26,9 @@ impl BinaryOp {
         match self {
             Self::Add => 1,
             Self::Subtract => 1,
-            // Self::Multiply => 2,
             Self::DotProduct => 2,
             Self::Divide => 2,
+            Self::Power => 3,
         }
     }
 }
@@ -164,6 +163,7 @@ impl Parser {
                 Some(Token::Minus) => BinaryOp::Subtract,
                 Some(Token::Cdot) => BinaryOp::DotProduct,
                 Some(Token::Slash) => BinaryOp::Divide,
+                Some(Token::Power) => BinaryOp::Power,
                 _ => break Ok(left),
             };
             if Some(op.binding_power()) > last_op.map(|op| op.binding_power()) {
@@ -292,9 +292,6 @@ impl fmt::Display for Expr {
                 UnaryOp::Plus => write!(f, "+{arg}"),
             },
             Self::BinOp { op, left, right } => {
-                // if *op == Op::Multiply {
-                //     return write!(f, "{left} {right}");
-                // }
                 // let left_bp = match left.as_ref() {
                 //     Self::BinOp { op, .. } => op.binding_power(),
                 //     _ => u8::MAX,
@@ -307,9 +304,9 @@ impl fmt::Display for Expr {
                 let op = match op {
                     BinaryOp::Add => '+',
                     BinaryOp::Subtract => '-',
-                    // Op::Multiply => unreachable!(),
                     BinaryOp::DotProduct => '*',
                     BinaryOp::Divide => '/',
+                    BinaryOp::Power => '^',
                 };
                 // match (left_bp > bp, right_bp > bp) {
                 match (

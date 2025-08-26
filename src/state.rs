@@ -111,7 +111,6 @@ impl State {
             }
             self.sampled_functions.push((*color, path));
         }
-
         Ok(())
     }
 
@@ -189,6 +188,7 @@ impl State {
         let scale = 1.0 - delta.signum() / 10.0;
 
         self.graph.viewport.width *= scale;
+        // eprintln!("{}", self.graph.viewport.width);
         self.graph.viewport.pos = cursor + scale * (self.graph.viewport.pos - cursor);
         if let Some(ClickStartState { viewport_pos, .. }) = &mut self.click_start {
             *viewport_pos = cursor + scale * (*viewport_pos - cursor);

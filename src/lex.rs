@@ -18,6 +18,7 @@ pub enum Token {
     Minus,
     Cdot,
     Slash,
+    Power,
 }
 
 impl fmt::Display for Token {
@@ -34,6 +35,7 @@ impl fmt::Display for Token {
             Self::Minus => "-",
             Self::Cdot => "*",
             Self::Slash => "/",
+            Self::Power => "^",
         })
     }
 }
@@ -129,6 +131,7 @@ impl<'a> Lexer<'a> {
                 '-' => Token::Minus,
                 '*' => Token::Cdot,
                 '/' => Token::Slash,
+                '^' => Token::Power,
                 c if c.is_ascii_alphabetic() => {
                     self.next_char_while(char::is_ascii_alphabetic);
                     Token::Ident(EcoString::from(&self.input[start..self.pos]))

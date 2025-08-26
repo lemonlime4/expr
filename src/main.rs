@@ -241,13 +241,10 @@ fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
         .with_title("Vello Shapes");
     let mut window = event_loop.create_window(attr).unwrap();
     let size = window.primary_monitor().unwrap().size();
-    window.set_outer_position(PhysicalPosition {
-        x: size.width / 2,
-        y: 0,
-    });
+    window.set_outer_position(PhysicalPosition { x: 0, y: 0 });
     window.request_inner_size(PhysicalSize {
         width: size.width / 2,
-        height: size.height,
+        height: size.height / 2,
     });
     Arc::new(window)
 }
