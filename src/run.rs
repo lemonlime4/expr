@@ -50,8 +50,13 @@ impl Interpreter {
         // eprintln!("running {item}");
         match item {
             TopLevelItem::Expression(expr) => {
-                let value = self.evaluate(&expr, &HashMap::new())?;
-                self.constants.push((None, value));
+                if expr.contains_var("x") {
+                    self.single_var_functions
+                        .push((EcoString::inline("x"), expr));
+                } else {
+                    let value = self.evaluate(&expr, &HashMap::new())?;
+                    self.constants.push((None, value));
+                }
             }
             TopLevelItem::Assignment { name, body } => {
                 if self.bindings.contains_key(&name) {
@@ -69,9 +74,6 @@ impl Interpreter {
                     if self.bindings.contains_key(arg) {
                         bail!("Cannot use argument '{arg}' as this name is already bound")
                     }
-                }
-                if let [arg] = args.as_slice() {
-                    self.single_var_functions.push((arg.clone(), body.clone()));
                 }
                 self.bindings.insert(name, Binding::Function { args, body });
             }
@@ -146,5 +148,19 @@ impl Interpreter {
                 }
             }
         })
+    }
+}
+
+impl Expr {
+    fn contains_var(&self, needle: &str) -> bool {
+        match self {
+            Self::Lit(_) => false,
+            Self::Variable(name) => name == needle,
+            Self::UnOp { arg, .. } => arg.contains_var(needle),
+            Self::BinOp { left, right, .. } => {
+                left.contains_var(needle) || right.contains_var(needle)
+            }
+            Self::Call { args, .. } => args.iter().any(|arg| arg.contains_var(needle)),
+        }
     }
 }
