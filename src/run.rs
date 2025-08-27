@@ -77,6 +77,9 @@ impl Interpreter {
                         bail!("Cannot use argument '{arg}' as this name is already bound")
                     }
                 }
+                if body.contains_func(name.as_str()) {
+                    bail!("Function '{name}' cannot recursively call itself");
+                }
                 self.bindings.insert(name, Binding::Function { args, body });
             }
         }
@@ -163,6 +166,20 @@ impl Expr {
                 left.contains_var(needle) || right.contains_var(needle)
             }
             Self::Call { args, .. } => args.iter().any(|arg| arg.contains_var(needle)),
+        }
+    }
+
+    fn contains_func(&self, needle: &str) -> bool {
+        match self {
+            Self::Lit(_) => false,
+            Self::Variable(_) => false,
+            Self::UnOp { arg, .. } => arg.contains_func(needle),
+            Self::BinOp { left, right, .. } => {
+                left.contains_func(needle) || right.contains_func(needle)
+            }
+            Self::Call { func, args } => {
+                func == needle || args.iter().any(|arg| arg.contains_var(needle))
+            }
         }
     }
 }
