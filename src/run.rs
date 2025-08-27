@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash};
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     builtins::BuiltinFunction,
@@ -54,7 +54,6 @@ impl Interpreter {
                 self.constants.push((None, value));
             }
             TopLevelItem::Assignment { name, body } => {
-                //
                 if self.bindings.contains_key(&name) {
                     bail!("Cannot define variable '{name}' as this name is already bound");
                 }
@@ -123,7 +122,7 @@ impl Interpreter {
                     }
                     self.evaluate(body, &new_arg_map)?
                 }
-                Some(Binding::Value(x)) => {
+                Some(Binding::Value(_)) => {
                     bail!("Cannot call '{func}' as it is not a function")
                 }
                 None => bail!("Function '{func}' not defined"),

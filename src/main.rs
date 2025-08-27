@@ -9,14 +9,12 @@ use crate::state::State;
 
 use anyhow::Result;
 use std::sync::Arc;
-use vello::kurbo::{Affine, Circle, Ellipse, Line, RoundedRect, Stroke};
-use vello::peniko::Color;
 use vello::peniko::color::palette;
 use vello::util::{RenderContext, RenderSurface};
 use vello::{AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalPosition, PhysicalSize};
-use winit::event::{DeviceEvent, MouseButton, WindowEvent};
+use winit::event::{MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::Window;
 
@@ -144,7 +142,7 @@ impl ApplicationHandler for App<'_> {
                 let height = surface.config.height;
 
                 // Re-add the objects to draw to the scene.
-                self.state.render(&mut self.scene, width, height);
+                self.state.render(&mut self.scene);
 
                 // Get a handle to the device
                 let device_handle = &self.context.devices[surface.dev_id];
@@ -207,7 +205,7 @@ fn main() -> Result<()> {
 
     let items = parse(input.as_str())?;
     let mut interpreter = Interpreter::new();
-    interpreter.run(items);
+    interpreter.run(items)?;
 
     // println!("{interpreter:#?}");
     for (name, value) in interpreter.constants.iter() {
@@ -215,6 +213,10 @@ fn main() -> Result<()> {
             print!("{name} = ");
         }
         println!("{value}");
+    }
+
+    if interpreter.single_var_functions.is_empty() {
+        return Ok(());
     }
 
     let mut app = App {
@@ -226,7 +228,7 @@ fn main() -> Result<()> {
     };
 
     let event_loop = EventLoop::new()?;
-    // event_loop.set_control_flow(ControlFlow::Poll);
+    event_loop.set_control_flow(ControlFlow::Wait);
     event_loop
         .run_app(&mut app)
         .expect("Couldn't run event loop");
@@ -239,10 +241,10 @@ fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
         .with_min_inner_size(LogicalSize::new(300, 100))
         .with_resizable(true)
         .with_title("Vello Shapes");
-    let mut window = event_loop.create_window(attr).unwrap();
+    let window = event_loop.create_window(attr).unwrap();
     let size = window.primary_monitor().unwrap().size();
     window.set_outer_position(PhysicalPosition { x: 0, y: 0 });
-    window.request_inner_size(PhysicalSize {
+    let _ = window.request_inner_size(PhysicalSize {
         width: size.width / 2,
         height: size.height / 2,
     });

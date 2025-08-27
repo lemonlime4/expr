@@ -1,12 +1,6 @@
-use std::{
-    cmp::{self, Ordering},
-    fmt::{self, Binary},
-    hint::unreachable_unchecked,
-    slice,
-};
+use std::fmt;
 
 use anyhow::{Result, bail};
-use ecow::{EcoString, EcoVec, eco_vec};
 
 use crate::lex::{Token, lex};
 
@@ -90,14 +84,6 @@ impl Parser {
 
     fn next(&mut self) -> Option<Token> {
         self.tokens.pop()
-    }
-
-    fn next_if(&mut self, f: impl Fn(&Token) -> bool) -> Option<Token> {
-        if self.peek().is_some_and(f) {
-            self.next()
-        } else {
-            None
-        }
     }
 
     fn consume_while<T>(&mut self, mut f: impl FnMut(&Token) -> Option<T>) -> Vec<T> {

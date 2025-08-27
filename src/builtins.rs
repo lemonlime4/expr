@@ -1,9 +1,7 @@
-use std::collections::HashMap;
-
 use anyhow::{Result, bail};
 use strum_macros::{EnumIter, IntoStaticStr};
 
-use crate::parse::{ArgList, Ident};
+use crate::parse::ArgList;
 
 #[derive(Debug, Clone, Copy, EnumIter, IntoStaticStr)]
 pub enum BuiltinFunction {

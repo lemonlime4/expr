@@ -55,8 +55,11 @@ impl State {
         Self {
             graph: Graph {
                 viewport: Viewport {
-                    pos: Point::new(6.0, 3.0),
+                    pos: Point::ZERO,
                     width: 20.0,
+                    // width: 0.000000000000000000000000000000002,
+                    // pos: Point::new(2.0, 2.0),
+                    // width: 0.0000000000001,
                 },
                 single_var_functions,
             },
@@ -91,7 +94,9 @@ impl State {
         for (color, arg, body) in self.graph.single_var_functions.iter() {
             let mut arg_map = HashMap::new();
             arg_map.insert(arg.clone(), 0.0);
-            let mut points = Vec::new();
+            let mut path = BezPath::new();
+            let mut new_segment = true;
+            // let mut points = Vec::new();
             for i in 0..n {
                 let x = {
                     let t = i as f64 / (n - 1) as f64;
@@ -99,22 +104,32 @@ impl State {
                 };
                 arg_map.insert(arg.clone(), x);
                 let y = self.interpreter.evaluate(body, &arg_map)?;
-                let point = Point { x, y } - self.graph.viewport.pos;
-                let point = point * self.window_size.x / self.graph.viewport.width;
-                let point = Affine::FLIP_Y * point.to_point();
-                points.push(point + self.window_size / 2.0);
+                if y.is_finite() {
+                    let point = Point { x, y } - self.graph.viewport.pos;
+                    let point = point * self.window_size.x / self.graph.viewport.width;
+                    let point = Affine::FLIP_Y * point.to_point();
+                    let point = point + self.window_size / 2.0;
+                    // points.push(point);
+                    if new_segment {
+                        path.move_to(point);
+                        new_segment = false;
+                    } else {
+                        path.line_to(point);
+                    }
+                } else {
+                    new_segment = true;
+                }
             }
-            let mut path = BezPath::new();
-            path.move_to(points[0]);
-            for point in &points[1..] {
-                path.line_to(*point);
-            }
+            // path.move_to(points[0]);
+            // for point in &points[1..] {
+            //     path.line_to(*point);
+            // }
             self.sampled_functions.push((*color, path));
         }
         Ok(())
     }
 
-    pub fn render(&self, scene: &mut Scene, width: u32, height: u32) {
+    pub fn render(&self, scene: &mut Scene) {
         const ID: Affine = Affine::IDENTITY;
 
         // draw background
@@ -153,7 +168,7 @@ impl State {
 
     pub fn set_window_size(&mut self, width: u32, height: u32) {
         self.window_size = Vec2::new(width as f64, height as f64);
-        self.sample_functions();
+        self.sample_functions().unwrap(); // TODO
     }
 
     pub fn handle_cursor_move(&mut self, pos: PhysicalPosition<f64>) {
@@ -163,7 +178,7 @@ impl State {
             offset *= self.graph.viewport.width / self.window_size.x;
             offset.x = -offset.x;
             self.graph.viewport.pos = click_start.viewport_pos + offset;
-            self.sample_functions();
+            self.sample_functions().unwrap(); // TODO
         }
     }
 
@@ -178,6 +193,7 @@ impl State {
     }
 
     pub fn handle_scroll(&mut self, delta: MouseScrollDelta) {
+        eprintln!("{}", self.graph.viewport.width);
         let delta = match delta {
             MouseScrollDelta::LineDelta(_, d) => d as f64,
             MouseScrollDelta::PixelDelta(pos) => pos.y,
@@ -186,6 +202,7 @@ impl State {
             / self.window_size.x;
         let cursor = self.graph.viewport.pos + Vec2::new(cursor.x, -cursor.y);
         let scale = 1.0 - delta.signum() / 10.0;
+        let cursor = self.graph.viewport.pos;
 
         self.graph.viewport.width *= scale;
         // eprintln!("{}", self.graph.viewport.width);
@@ -193,6 +210,6 @@ impl State {
         if let Some(ClickStartState { viewport_pos, .. }) = &mut self.click_start {
             *viewport_pos = cursor + scale * (*viewport_pos - cursor);
         }
-        self.sample_functions();
+        self.sample_functions().unwrap(); // TODO
     }
 }
