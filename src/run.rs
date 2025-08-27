@@ -19,6 +19,10 @@ enum Binding {
 #[derive(Debug)]
 pub struct Interpreter {
     bindings: HashMap<Ident, Binding>,
+}
+
+#[derive(Default)]
+pub struct Output {
     pub constants: Vec<(Option<Ident>, f64)>,
     pub single_var_functions: Vec<(Ident, Expr)>,
 }
@@ -32,30 +36,28 @@ impl Interpreter {
                 Binding::Builtin(builtin),
             );
         }
-        Self {
-            bindings,
-            constants: Vec::new(),
-            single_var_functions: Vec::new(),
-        }
+        Self { bindings }
     }
 
-    pub fn run(&mut self, items: Vec<TopLevelItem>) -> Result<()> {
+    pub fn run(&mut self, items: Vec<TopLevelItem>) -> Result<Output> {
+        let mut output = Output::default();
         for item in items {
-            self.add_item(item)?;
+            self.add_item(item, &mut output)?;
         }
-        Ok(())
+        Ok(output)
     }
 
-    pub fn add_item(&mut self, item: TopLevelItem) -> Result<()> {
+    pub fn add_item(&mut self, item: TopLevelItem, output: &mut Output) -> Result<()> {
         // eprintln!("running {item}");
         match item {
             TopLevelItem::Expression(expr) => {
                 if expr.contains_var("x") {
-                    self.single_var_functions
+                    output
+                        .single_var_functions
                         .push((EcoString::inline("x"), expr));
                 } else {
                     let value = self.evaluate(&expr, &HashMap::new())?;
-                    self.constants.push((None, value));
+                    output.constants.push((None, value));
                 }
             }
             TopLevelItem::Assignment { name, body } => {
@@ -63,7 +65,7 @@ impl Interpreter {
                     bail!("Cannot define variable '{name}' as this name is already bound");
                 }
                 let value = self.evaluate(&body, &HashMap::new())?;
-                self.constants.push((Some(name.clone()), value));
+                output.constants.push((Some(name.clone()), value));
                 self.bindings.insert(name, Binding::Value(value));
             }
             TopLevelItem::FunctionDef { name, args, body } => {

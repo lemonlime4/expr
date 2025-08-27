@@ -205,17 +205,17 @@ fn main() -> Result<()> {
 
     let items = parse(input.as_str())?;
     let mut interpreter = Interpreter::new();
-    interpreter.run(items)?;
+    let output = interpreter.run(items)?;
 
     // println!("{interpreter:#?}");
-    for (name, value) in interpreter.constants.iter() {
+    for (name, value) in output.constants.iter() {
         if let Some(name) = name {
             print!("{name} = ");
         }
         println!("{value}");
     }
 
-    if interpreter.single_var_functions.is_empty() {
+    if output.single_var_functions.is_empty() {
         return Ok(());
     }
 
@@ -224,7 +224,7 @@ fn main() -> Result<()> {
         renderers: vec![],
         render_state: RenderState::Suspended(None),
         scene: Scene::new(),
-        state: State::new(interpreter),
+        state: State::new(interpreter, output),
     };
 
     let event_loop = EventLoop::new()?;

@@ -11,6 +11,7 @@ use winit::event::MouseScrollDelta;
 use crate::parse::Expr;
 use crate::parse::Ident;
 use crate::run::Interpreter;
+use crate::run::Output;
 
 #[derive(Debug, Clone)]
 pub struct Viewport {
@@ -32,6 +33,7 @@ struct ClickStartState {
 pub struct State {
     pub graph: Graph,
     interpreter: Interpreter,
+    output: Output,
     sampled_functions: Vec<(Color, BezPath)>,
     cursor: Point,
     click_start: Option<ClickStartState>,
@@ -39,7 +41,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(interpreter: Interpreter) -> Self {
+    pub fn new(interpreter: Interpreter, output: Output) -> Self {
         let colors = [
             Color::from_rgb8(199, 68, 64),
             Color::from_rgb8(45, 112, 179),
@@ -48,7 +50,7 @@ impl State {
             Color::from_rgb8(0, 0, 0),
         ];
         let mut single_var_functions = Vec::new();
-        for (i, (arg, body)) in interpreter.single_var_functions.iter().enumerate() {
+        for (i, (arg, body)) in output.single_var_functions.iter().enumerate() {
             single_var_functions.push((colors[i % colors.len()], arg.clone(), body.clone()));
         }
 
@@ -56,7 +58,8 @@ impl State {
             graph: Graph {
                 viewport: Viewport {
                     pos: Point::ZERO,
-                    width: 20.0,
+                    // width: 20.0,
+                    width: 1e-295,
                     // width: 0.000000000000000000000000000000002,
                     // pos: Point::new(2.0, 2.0),
                     // width: 0.0000000000001,
@@ -64,6 +67,7 @@ impl State {
                 single_var_functions,
             },
             interpreter,
+            output,
             sampled_functions: Vec::new(),
             window_size: Vec2::ZERO,
             cursor: Point::ZERO,
@@ -104,12 +108,8 @@ impl State {
                 };
                 arg_map.insert(arg.clone(), x);
                 let y = self.interpreter.evaluate(body, &arg_map)?;
+                let point = self.graph_to_window(Point { x, y });
                 if y.is_finite() {
-                    let point = Point { x, y } - self.graph.viewport.pos;
-                    let point = point * self.window_size.x / self.graph.viewport.width;
-                    let point = Affine::FLIP_Y * point.to_point();
-                    let point = point + self.window_size / 2.0;
-                    // points.push(point);
                     if new_segment {
                         path.move_to(point);
                         new_segment = false;
@@ -141,10 +141,10 @@ impl State {
         let stroke = Stroke::new(1.0);
         let color = Color::from_rgba8(0, 0, 0, 64);
         for x in -100..=100 {
-            scene.stroke(&stroke, ID, color, None, &self.horizontal_line(x as f64));
+            // scene.stroke(&stroke, ID, color, None, &self.horizontal_line(x as f64));
         }
         for y in -100..=100 {
-            scene.stroke(&stroke, ID, color, None, &self.vertical_line(y as f64));
+            // scene.stroke(&stroke, ID, color, None, &self.vertical_line(y as f64));
         }
 
         // draw functions
@@ -193,16 +193,13 @@ impl State {
     }
 
     pub fn handle_scroll(&mut self, delta: MouseScrollDelta) {
-        eprintln!("{}", self.graph.viewport.width);
+        eprintln!("{:?}", self.graph.viewport.width);
         let delta = match delta {
             MouseScrollDelta::LineDelta(_, d) => d as f64,
             MouseScrollDelta::PixelDelta(pos) => pos.y,
         };
-        let cursor = (self.cursor.to_vec2() - self.window_size / 2.0) * self.graph.viewport.width
-            / self.window_size.x;
-        let cursor = self.graph.viewport.pos + Vec2::new(cursor.x, -cursor.y);
+        let cursor = self.window_to_graph(self.cursor);
         let scale = 1.0 - delta.signum() / 10.0;
-        let cursor = self.graph.viewport.pos;
 
         self.graph.viewport.width *= scale;
         // eprintln!("{}", self.graph.viewport.width);
@@ -212,4 +209,22 @@ impl State {
         }
         self.sample_functions().unwrap(); // TODO
     }
+
+    pub fn window_to_graph(&mut self, p: Point) -> Point {
+        self.graph.viewport.pos
+            + flip_y(self.cursor.to_vec2() - self.window_size / 2.0) * self.graph.viewport.width
+                / self.window_size.x
+    }
+
+    pub fn graph_to_window(&self, p: Point) -> Point {
+        let point = p - self.graph.viewport.pos;
+        let point = point * self.window_size.x / self.graph.viewport.width;
+        let point = Affine::FLIP_Y * point.to_point();
+        let point = point + self.window_size / 2.0;
+        point
+    }
+}
+
+fn flip_y(v: Vec2) -> Vec2 {
+    Vec2::new(v.x, -v.y)
 }

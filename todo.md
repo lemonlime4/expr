@@ -1,7 +1,6 @@
 -   disallow recursive functions
 -   factor out viewport <-> screen coordinate transform
 -   make errors properly display
--   remove `constants` and `single_var_functions` from `Interpreter`
 
 -   fix crash when minimized
 -   optimize x^2 (and add special behavior for fractions?)
