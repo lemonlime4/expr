@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::mpsc::Receiver;
 
 use anyhow::Result;
 use vello::Scene;
@@ -8,10 +9,18 @@ use winit::dpi::PhysicalPosition;
 use winit::event::ElementState;
 use winit::event::MouseScrollDelta;
 
+use crate::eval::Interpreter;
+use crate::eval::Output;
 use crate::parse::Expr;
 use crate::parse::Ident;
-use crate::run::Interpreter;
-use crate::run::Output;
+
+const COLORS: &[Color] = &[
+    Color::from_rgb8(199, 68, 64),
+    Color::from_rgb8(45, 112, 179),
+    Color::from_rgb8(52, 133, 67),
+    Color::from_rgb8(96, 66, 166),
+    Color::from_rgb8(0, 0, 0),
+];
 
 #[derive(Debug, Clone)]
 pub struct Viewport {
@@ -32,47 +41,50 @@ struct ClickStartState {
 
 pub struct State {
     pub graph: Graph,
-    interpreter: Interpreter,
-    output: Output,
     sampled_functions: Vec<(Color, BezPath)>,
     cursor: Point,
     click_start: Option<ClickStartState>,
     window_size: Vec2,
+    interpreter: Interpreter,
 }
 
 impl State {
-    pub fn new(interpreter: Interpreter, output: Output) -> Self {
-        let colors = [
-            Color::from_rgb8(199, 68, 64),
-            Color::from_rgb8(45, 112, 179),
-            Color::from_rgb8(52, 133, 67),
-            Color::from_rgb8(96, 66, 166),
-            Color::from_rgb8(0, 0, 0),
-        ];
+    pub fn new() -> Self {
         let mut single_var_functions = Vec::new();
-        for (i, (arg, body)) in output.single_var_functions.iter().enumerate() {
-            single_var_functions.push((colors[i % colors.len()], arg.clone(), body.clone()));
-        }
 
         Self {
             graph: Graph {
                 viewport: Viewport {
                     pos: Point::ZERO,
-                    // width: 20.0,
-                    width: 1e-295,
+                    width: 20.0,
+                    // width: 1e-295,
                     // width: 0.000000000000000000000000000000002,
                     // pos: Point::new(2.0, 2.0),
                     // width: 0.0000000000001,
                 },
                 single_var_functions,
             },
-            interpreter,
-            output,
             sampled_functions: Vec::new(),
             window_size: Vec2::ZERO,
             cursor: Point::ZERO,
             click_start: None,
+            interpreter: Interpreter::new(),
         }
+    }
+
+    pub fn update(&mut self, interpreter: Interpreter, output: Output) {
+        self.interpreter = interpreter;
+        self.graph.single_var_functions = Vec::new();
+        for ((arg, body), color) in output
+            .single_var_functions
+            .iter()
+            .zip(COLORS.iter().copied().cycle())
+        {
+            self.graph
+                .single_var_functions
+                .push((color, arg.clone(), body.clone()));
+        }
+        self.sample_functions();
     }
 
     pub fn sample_functions(&mut self) -> Result<()> {
@@ -224,6 +236,10 @@ impl State {
         point
     }
 }
+
+// impl Graph {
+//     fn set_expressions()
+// }
 
 fn flip_y(v: Vec2) -> Vec2 {
     Vec2::new(v.x, -v.y)

@@ -1,14 +1,19 @@
 #![allow(unused)]
 mod builtins;
+mod eval;
 mod lex;
 mod parse;
-mod run;
 mod state;
 
 use crate::state::State;
 
 use anyhow::Result;
-use std::sync::Arc;
+use notify::event::{CreateKind, DataChange, ModifyKind};
+use notify::{Event, EventKind, RecursiveMode, Watcher};
+use std::path::Path;
+use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use vello::peniko::color::palette;
 use vello::util::{RenderContext, RenderSurface};
 use vello::{AaConfig, Renderer, RendererOptions, Scene};
@@ -20,8 +25,8 @@ use winit::window::Window;
 
 use vello::wgpu;
 
+use crate::eval::{Interpreter, Output};
 use crate::parse::parse;
-use crate::run::Interpreter;
 
 #[derive(Debug)]
 enum RenderState<'s> {
@@ -54,7 +59,7 @@ struct App<'s> {
     state: State,
 }
 
-impl ApplicationHandler for App<'_> {
+impl ApplicationHandler<String> for App<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let RenderState::Suspended(cached_window) = &mut self.render_state else {
             return;
@@ -91,6 +96,32 @@ impl ApplicationHandler for App<'_> {
         if let RenderState::Active { window, .. } = &self.render_state {
             self.render_state = RenderState::Suspended(Some(window.clone()));
         }
+    }
+
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, input: String) {
+        println!("--------------------------------");
+        let items = match parse(input.as_str()) {
+            Ok(items) => items,
+            Err(err) => {
+                println!("Parse error - {err}");
+                return;
+            }
+        };
+        let mut interpreter = Interpreter::new();
+        let output = match interpreter.run(items) {
+            Ok(output) => output,
+            Err(err) => {
+                println!("{err}");
+                return;
+            }
+        };
+        for (name, value) in output.constants.iter() {
+            if let Some(name) = name {
+                print!("{name} = ");
+            }
+            println!("{value}");
+        }
+        self.state.update(interpreter, output);
     }
 
     fn window_event(
@@ -201,33 +232,52 @@ impl ApplicationHandler for App<'_> {
 }
 
 fn main() -> Result<()> {
-    let input = std::fs::read_to_string("input.txt").expect("Couldn't read input.txt");
-
-    let items = parse(input.as_str())?;
-    let mut interpreter = Interpreter::new();
-    let output = interpreter.run(items)?;
-
-    // println!("{interpreter:#?}");
-    for (name, value) in output.constants.iter() {
-        if let Some(name) = name {
-            print!("{name} = ");
-        }
-        println!("{value}");
-    }
-
-    if output.single_var_functions.is_empty() {
-        return Ok(());
-    }
-
     let mut app = App {
         context: RenderContext::new(),
         renderers: vec![],
         render_state: RenderState::Suspended(None),
         scene: Scene::new(),
-        state: State::new(interpreter, output),
+        state: State::new(),
     };
 
-    let event_loop = EventLoop::new()?;
+    let event_loop = EventLoop::<String>::with_user_event().build()?;
+    let proxy = event_loop.create_proxy();
+
+    // println!("{interpreter:#?}");
+
+    let mut last_event_time = Instant::now();
+    let mut watcher = notify::recommended_watcher(move |event| match event {
+        Ok(Event {
+            kind,
+            //     EventKind::Any
+            //     | EventKind::Create(CreateKind::Any | CreateKind::File)
+            //     | EventKind::Modify(ModifyKind::Any | ModifyKind::Data(_)),
+            paths,
+            ..
+        }) => {
+            if last_event_time.elapsed() < Duration::from_millis(100) {
+                return;
+            }
+            last_event_time = Instant::now();
+
+            let Some((path, input)) = paths.into_iter().rev().find_map(|path| {
+                match std::fs::read_to_string(path.as_path()) {
+                    Ok(string) => Some((path, string)),
+                    Err(_) => None,
+                }
+            }) else {
+                return;
+            };
+
+            // println!("Running {}", path.display());
+            // println!("Kind: {kind:?}");
+            // println!("Input: {}", input.as_str());
+            proxy.send_event(input);
+        }
+        _ => {}
+    })?;
+    watcher.watch(Path::new("."), RecursiveMode::Recursive)?;
+
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop
         .run_app(&mut app)

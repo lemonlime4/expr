@@ -1,3 +1,4 @@
+-   figure out why sometimes reads empty file
 -   disallow recursive functions
 -   factor out viewport <-> screen coordinate transform
 -   make errors properly display

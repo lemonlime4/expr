@@ -134,24 +134,11 @@ impl Interpreter {
                 }
                 None => bail!("Function '{func}' not defined"),
             },
-            Expr::UnOp { op, arg } => {
-                let arg = self.evaluate(arg, arg_map)?;
-                match op {
-                    UnaryOp::Negate => -arg,
-                    UnaryOp::Plus => arg,
-                }
-            }
-            Expr::BinOp { op, left, right } => {
-                let left = self.evaluate(left, arg_map)?;
-                let right = self.evaluate(right, arg_map)?;
-                match op {
-                    BinaryOp::Add => left + right,
-                    BinaryOp::Subtract => left - right,
-                    BinaryOp::DotProduct => left * right,
-                    BinaryOp::Divide => left / right,
-                    BinaryOp::Power => left.powf(right),
-                }
-            }
+            Expr::UnOp { op, arg } => op.evaluate(self.evaluate(arg, arg_map)?),
+            Expr::BinOp { op, left, right } => op.evaluate(
+                self.evaluate(left, arg_map)?,
+                self.evaluate(right, arg_map)?,
+            ),
         })
     }
 }
@@ -180,6 +167,32 @@ impl Expr {
             Self::Call { func, args } => {
                 func == needle || args.iter().any(|arg| arg.contains_var(needle))
             }
+        }
+    }
+}
+
+enum SingleVarFunction {
+    Lit(f64),
+    Var,
+}
+
+impl UnaryOp {
+    pub fn evaluate(&self, arg: f64) -> f64 {
+        match self {
+            Self::Negate => -arg,
+            Self::Plus => arg,
+        }
+    }
+}
+
+impl BinaryOp {
+    pub fn evaluate(&self, left: f64, right: f64) -> f64 {
+        match self {
+            Self::Add => left + right,
+            Self::Subtract => left - right,
+            Self::DotProduct => left * right,
+            Self::Divide => left / right,
+            Self::Power => left.powf(right),
         }
     }
 }
