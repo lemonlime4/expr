@@ -276,7 +276,7 @@ fn main() -> Result<()> {
         }
         _ => {}
     })?;
-    watcher.watch(Path::new("."), RecursiveMode::Recursive)?;
+    watcher.watch(Path::new("./input.txt"), RecursiveMode::Recursive)?;
 
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop
