@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::f64;
 use std::sync::mpsc::Receiver;
 
 use anyhow::Result;
@@ -11,6 +12,7 @@ use winit::event::MouseScrollDelta;
 
 use crate::eval::Interpreter;
 use crate::eval::Output;
+use crate::graphing;
 use crate::parse::Expr;
 use crate::parse::Ident;
 
@@ -105,33 +107,21 @@ impl State {
             } = self.graph.viewport;
             (x - width / 2.0, x + width / 2.0)
         };
-        let n = (self.window_size.x / 5.0).round() as u32;
+        let mut arg_map = HashMap::new();
 
         for (color, arg, body) in self.graph.single_var_functions.iter() {
-            let mut arg_map = HashMap::new();
-            arg_map.insert(arg.clone(), 0.0);
-            let mut path = BezPath::new();
-            let mut new_segment = true;
-            // let mut points = Vec::new();
-            for i in 0..n {
-                let x = {
-                    let t = i as f64 / (n - 1) as f64;
-                    xmin * (1.0 - t) + xmax * t
-                };
-                arg_map.insert(arg.clone(), x);
-                let y = self.interpreter.evaluate(body, &arg_map)?;
-                let point = self.graph_to_window(Point { x, y });
-                if y.is_finite() {
-                    if new_segment {
-                        path.move_to(point);
-                        new_segment = false;
-                    } else {
-                        path.line_to(point);
-                    }
-                } else {
-                    new_segment = true;
-                }
-            }
+            let path = graphing::sample_single_var_function(
+                xmin,
+                xmax,
+                (self.window_size.x / 10.0).ceil() as u32,
+                |x| {
+                    arg_map.insert(arg.clone(), x);
+                    self.interpreter
+                        .evaluate(body, &arg_map)
+                        .unwrap_or(f64::NAN)
+                },
+                |p| self.graph_to_window(p),
+            );
             // path.move_to(points[0]);
             // for point in &points[1..] {
             //     path.line_to(*point);

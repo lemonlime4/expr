@@ -1,6 +1,7 @@
 #![allow(unused)]
 mod builtins;
 mod eval;
+mod graphing;
 mod lex;
 mod parse;
 mod state;
@@ -277,6 +278,14 @@ fn main() -> Result<()> {
         _ => {}
     })?;
     watcher.watch(Path::new("./input.txt"), RecursiveMode::Recursive)?;
+
+    let proxy = event_loop.create_proxy();
+    match std::fs::read_to_string(Path::new("./input.txt")) {
+        Ok(s) => {
+            proxy.send_event(s);
+        }
+        Err(_) => {}
+    }
 
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop
