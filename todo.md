@@ -1,12 +1,10 @@
+-   better background grid
+-   clamp line segments to viewport to avoid vello "performance cliff"
+-   resample functions on separate thread
+
 -   figure out why sometimes reads empty file
--   disallow recursive functions
--   make errors properly display
 
 -   optimize x^2 (and add special behavior for fractions?)
--   better background grid
-
-# far future
-
 -   improve the runtime
 -   better (order independent) name resolution
 
@@ -14,4 +12,5 @@
 -   point and list types
 -   implicits, parametrics, points, polygons
 
+-   make errors properly display
 -   diagnose multiple independent errors at the same time

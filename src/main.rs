@@ -58,6 +58,8 @@ struct App<'s> {
     scene: Scene,
 
     state: State,
+
+    fps_timer: Timer,
 }
 
 impl ApplicationHandler<String> for App<'_> {
@@ -179,13 +181,15 @@ impl ApplicationHandler<String> for App<'_> {
                 // Re-add the objects to draw to the scene.
                 self.state.sample_functions(); // TODO remove
                 self.state.render(&mut self.scene);
-                let now = Instant::now();
-                let diff = now.duration_since(self.state.fps_display_last_time);
-                let new_fps = 1.0 / diff.as_secs_f64();
-                let fps = new_fps.midpoint(self.state.last_fps);
-                self.state.last_fps = fps;
-                self.state.fps_display_last_time = now;
-                eprint!("\rfps: {}", ((fps / 5.0).round() * 5.0).round());
+                self.fps_timer.stop_measure();
+                eprint!(
+                    "{}",
+                    format!(
+                        "\rrendering: {} ms              ",
+                        self.fps_timer.average_duration().round()
+                    )
+                );
+                self.fps_timer.start_measure();
 
                 // Get a handle to the device
                 let device_handle = &self.context.devices[surface.dev_id];
@@ -250,6 +254,7 @@ fn main() -> Result<()> {
         render_state: RenderState::Suspended(None),
         scene: Scene::new(),
         state: State::new(),
+        fps_timer: Timer::new(10),
     };
 
     let event_loop = EventLoop::<String>::with_user_event().build()?;
@@ -327,4 +332,37 @@ fn create_vello_renderer(render_cx: &RenderContext, surface: &RenderSurface<'_>)
         RendererOptions::default(),
     )
     .expect("Couldn't create renderer")
+}
+
+struct Timer {
+    last_instant: Instant,
+    durations: Vec<f64>,
+    duration_track_count: usize,
+}
+
+impl Timer {
+    fn new(duration_track_count: usize) -> Self {
+        let mut durations = Vec::new();
+        durations.reserve_exact(duration_track_count);
+        Self {
+            last_instant: Instant::now(),
+            durations,
+            duration_track_count,
+        }
+    }
+    fn start_measure(&mut self) {
+        self.last_instant = Instant::now();
+    }
+    fn stop_measure(&mut self) {
+        let now = Instant::now();
+        let duration = now.duration_since(self.last_instant).as_secs_f64() * 1000.0;
+        while self.durations.len() >= self.duration_track_count {
+            self.durations.pop();
+        }
+        self.durations.insert(0, duration);
+        self.last_instant = now;
+    }
+    fn average_duration(&mut self) -> f64 {
+        self.durations.iter().copied().sum::<f64>() / self.durations.len() as f64
+    }
 }
