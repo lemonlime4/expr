@@ -8,7 +8,7 @@ pub fn sample_single_var_function(
     initial_segment_count: u32,
     mut f: impl FnMut(f64) -> f64,
     graph_to_window: impl Fn(Point) -> Point,
-) -> (Vec<Point>, Vec<bool>) {
+) -> Vec<Point> {
     assert!(initial_segment_count >= 2);
     struct Sample {
         /// X coordinate in graph space
@@ -24,6 +24,25 @@ pub fn sample_single_var_function(
             }
         }
     }
+    impl PartialEq for Sample {
+        fn eq(&self, other: &Self) -> bool {
+            use std::cmp::Ordering::Equal;
+            self.x.total_cmp(&other.x) == Equal
+                && self.p.x.total_cmp(&other.p.x) == Equal
+                && self.p.y.total_cmp(&other.p.y) == Equal
+        }
+    }
+    impl Eq for Sample {}
+    impl PartialOrd for Sample {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            self.x.partial_cmp(&other.x)
+        }
+    }
+    impl Ord for Sample {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            self.partial_cmp(other).unwrap()
+        }
+    }
 
     let mut samples = Vec::new();
     for i in 0..=initial_segment_count {
@@ -33,34 +52,38 @@ pub fn sample_single_var_function(
         };
         samples.push(Sample::new(x, f(x), &graph_to_window));
     }
-    let min_angle: f64 = 175.0;
+    let min_angle: f64 = 170.0;
     let mut need_resampling = Vec::new();
-    let mut corners = vec![false; samples.len()];
-    for _ in 0..1 {
+
+    let subsamples = 5;
+    for i in 0..subsamples + 1 {
         let mut resampled = false;
         need_resampling.clear();
         need_resampling.resize(samples.len() - 1, false);
+
         for (i, (p1, p2, p3)) in samples.iter().map(|s| s.p).tuple_windows().enumerate() {
             if (p1 - p2).normalize().dot((p3 - p2).normalize()) > min_angle.to_radians().cos() {
-                // need_resampling[i] = true;
-                // need_resampling[i + 1] = true;
-                // resampled = true;
-                corners[i] = true;
+                need_resampling[i] = true;
+                need_resampling[i + 1] = true;
+                resampled = true;
             }
         }
-        // if !resampled {
-        //     break;
-        // }
+        if i == subsamples {
+            break;
+        }
+        if !resampled {
+            break;
+        }
 
-        // let mut offset = 0;
-        // for (i, &need_resampling) in need_resampling.iter().enumerate() {
-        //     if need_resampling {
-        //         let x = samples[i + offset].x.midpoint(samples[i + offset + 1].x);
-        //         samples.insert(i + offset + 1, Sample::new(x, f(x), &graph_to_window));
-        //         offset += 1;
-        //     }
-        // }
+        let mut offset = 0;
+        for (i, &need_resampling) in need_resampling.iter().enumerate() {
+            if need_resampling {
+                let x = samples[i + offset].x.midpoint(samples[i + offset + 1].x);
+                samples.insert(i + offset + 1, Sample::new(x, f(x), &graph_to_window));
+                offset += 1;
+            }
+        }
     }
 
-    (samples.into_iter().map(|s| s.p).collect(), corners)
+    samples.into_iter().map(|s| s.p).collect()
 }

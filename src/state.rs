@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::f64;
 use std::sync::mpsc::Receiver;
+use std::time::Instant;
 
 use anyhow::Result;
 use vello::Scene;
@@ -43,11 +44,14 @@ struct ClickStartState {
 
 pub struct State {
     pub graph: Graph,
-    sampled_functions: Vec<(Color, Vec<Point>, Vec<bool>)>,
+    sampled_functions: Vec<(Color, Vec<Point>)>,
     cursor: Point,
     click_start: Option<ClickStartState>,
     window_size: Vec2,
     interpreter: Interpreter,
+
+    pub fps_display_last_time: Instant,
+    pub last_fps: f64,
 }
 
 impl State {
@@ -71,6 +75,8 @@ impl State {
             cursor: Point::ZERO,
             click_start: None,
             interpreter: Interpreter::new(),
+            fps_display_last_time: Instant::now(),
+            last_fps: 0.0,
         }
     }
 
@@ -110,15 +116,17 @@ impl State {
         let mut arg_map = HashMap::new();
 
         for (color, arg, body) in self.graph.single_var_functions.iter() {
-            let (points, corners) = graphing::sample_single_var_function(
+            let points = graphing::sample_single_var_function(
                 xmin,
                 xmax,
                 (self.window_size.x / 10.0).ceil() as u32,
                 |x| {
                     arg_map.insert(arg.clone(), x);
-                    self.interpreter
+                    let y = self
+                        .interpreter
                         .evaluate(body, &arg_map)
-                        .unwrap_or(f64::NAN)
+                        .unwrap_or(f64::NAN);
+                    if y.is_finite() { y } else { 0.0 }
                 },
                 |p| self.graph_to_window(p),
             );
@@ -126,7 +134,7 @@ impl State {
             // for point in &points[1..] {
             //     path.line_to(*point);
             // }
-            self.sampled_functions.push((*color, points, corners));
+            self.sampled_functions.push((*color, points));
         }
         Ok(())
     }
@@ -159,9 +167,9 @@ impl State {
         }
 
         // draw functions
-        let stroke = Stroke::new(1.5);
+        let stroke = Stroke::new(1.0);
         let fill = Fill::NonZero;
-        for (color, points, corners) in self.sampled_functions.iter() {
+        for (color, points) in self.sampled_functions.iter() {
             let mut path = BezPath::new();
             path.move_to(points[0]);
             for p in &points[1..] {
@@ -169,16 +177,20 @@ impl State {
             }
             scene.stroke(&stroke, ID, color, None, &path);
 
-            for (p, has_corner) in std::iter::zip(points, corners) {
-                let (radius, color) = if *has_corner {
-                    (5.0, &Color::from_rgb8(0, 127, 127))
-                } else {
-                    (2.0, color)
-                };
+            for p in points {
+                let (radius, color) = (1.5, color);
                 let circle = Circle::new(*p, radius);
                 scene.fill(fill, ID, color, None, &circle);
             }
         }
+
+        scene.fill(
+            Fill::NonZero,
+            ID,
+            &Color::WHITE,
+            None,
+            &Rect::new(0.0, 0.0, 120.0, 20.0),
+        )
     }
 
     fn horizontal_line(&self, x: f64) -> Line {
@@ -220,7 +232,7 @@ impl State {
     }
 
     pub fn handle_scroll(&mut self, delta: MouseScrollDelta) {
-        eprintln!("{:?}", self.graph.viewport.width);
+        // eprint!("viewport width: {:?}\r", self.graph.viewport.width);
         let delta = match delta {
             MouseScrollDelta::LineDelta(_, d) => d as f64,
             MouseScrollDelta::PixelDelta(pos) => pos.y,

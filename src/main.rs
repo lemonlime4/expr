@@ -177,7 +177,15 @@ impl ApplicationHandler<String> for App<'_> {
                 let height = surface.config.height;
 
                 // Re-add the objects to draw to the scene.
+                self.state.sample_functions(); // TODO remove
                 self.state.render(&mut self.scene);
+                let now = Instant::now();
+                let diff = now.duration_since(self.state.fps_display_last_time);
+                let new_fps = 1.0 / diff.as_secs_f64();
+                let fps = new_fps.midpoint(self.state.last_fps);
+                self.state.last_fps = fps;
+                self.state.fps_display_last_time = now;
+                eprint!("\rfps: {}", ((fps / 5.0).round() * 5.0).round());
 
                 // Get a handle to the device
                 let device_handle = &self.context.devices[surface.dev_id];
