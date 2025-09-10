@@ -43,7 +43,7 @@ struct ClickStartState {
 
 pub struct State {
     pub graph: Graph,
-    sampled_functions: Vec<(Color, BezPath)>,
+    sampled_functions: Vec<(Color, Vec<Point>, Vec<bool>)>,
     cursor: Point,
     click_start: Option<ClickStartState>,
     window_size: Vec2,
@@ -110,7 +110,7 @@ impl State {
         let mut arg_map = HashMap::new();
 
         for (color, arg, body) in self.graph.single_var_functions.iter() {
-            let path = graphing::sample_single_var_function(
+            let (points, corners) = graphing::sample_single_var_function(
                 xmin,
                 xmax,
                 (self.window_size.x / 10.0).ceil() as u32,
@@ -126,7 +126,7 @@ impl State {
             // for point in &points[1..] {
             //     path.line_to(*point);
             // }
-            self.sampled_functions.push((*color, path));
+            self.sampled_functions.push((*color, points, corners));
         }
         Ok(())
     }
@@ -143,16 +143,41 @@ impl State {
         let stroke = Stroke::new(1.0);
         let color = Color::from_rgba8(0, 0, 0, 64);
         for x in -100..=100 {
-            // scene.stroke(&stroke, ID, color, None, &self.horizontal_line(x as f64));
+            let x = x as f64;
+            if (x - self.graph.viewport.pos.x).abs() >= self.graph.viewport.width / 2.0 {
+                continue;
+            }
+            scene.stroke(&stroke, ID, color, None, &self.horizontal_line(x));
         }
+        let viewport_height = self.graph.viewport.width * self.window_size.y / self.window_size.x;
         for y in -100..=100 {
-            // scene.stroke(&stroke, ID, color, None, &self.vertical_line(y as f64));
+            let y = y as f64;
+            if (y - self.graph.viewport.pos.y).abs() >= viewport_height / 2.0 {
+                continue;
+            }
+            scene.stroke(&stroke, ID, color, None, &self.vertical_line(y));
         }
 
         // draw functions
-        let stroke = Stroke::new(5.0);
-        for (color, path) in self.sampled_functions.iter() {
-            scene.stroke(&stroke, ID, color, None, path);
+        let stroke = Stroke::new(1.5);
+        let fill = Fill::NonZero;
+        for (color, points, corners) in self.sampled_functions.iter() {
+            let mut path = BezPath::new();
+            path.move_to(points[0]);
+            for p in &points[1..] {
+                path.line_to(*p);
+            }
+            scene.stroke(&stroke, ID, color, None, &path);
+
+            for (p, has_corner) in std::iter::zip(points, corners) {
+                let (radius, color) = if *has_corner {
+                    (5.0, &Color::from_rgb8(0, 127, 127))
+                } else {
+                    (2.0, color)
+                };
+                let circle = Circle::new(*p, radius);
+                scene.fill(fill, ID, color, None, &circle);
+            }
         }
     }
 
@@ -201,10 +226,10 @@ impl State {
             MouseScrollDelta::PixelDelta(pos) => pos.y,
         };
         let cursor = self.window_to_graph(self.cursor);
+        let cursor = Point::ZERO;
         let scale = 1.0 - delta.signum() / 10.0;
 
         self.graph.viewport.width *= scale;
-        // eprintln!("{}", self.graph.viewport.width);
         self.graph.viewport.pos = cursor + scale * (self.graph.viewport.pos - cursor);
         if let Some(ClickStartState { viewport_pos, .. }) = &mut self.click_start {
             *viewport_pos = cursor + scale * (*viewport_pos - cursor);

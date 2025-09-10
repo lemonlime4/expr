@@ -138,11 +138,14 @@ impl ApplicationHandler<String> for App<'_> {
             }
             _ => return,
         };
-
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
 
             WindowEvent::Resized(size) => {
+                if size.width == 0 || size.height == 0 {
+                    // todo find out if there's a better way to avoid crashing when minimized
+                    return;
+                }
                 self.context
                     .resize_surface(surface, size.width, size.height);
                 self.state.set_window_size(size.width, size.height);
@@ -297,7 +300,7 @@ fn main() -> Result<()> {
 
 fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
     let attr = Window::default_attributes()
-        .with_min_inner_size(LogicalSize::new(300, 100))
+        .with_min_inner_size(LogicalSize::new(300, 200))
         .with_resizable(true)
         .with_title("Vello Shapes");
     let window = event_loop.create_window(attr).unwrap();
