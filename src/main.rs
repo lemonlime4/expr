@@ -1,12 +1,12 @@
 #![allow(unused)]
 mod builtins;
+mod calculator;
 mod eval;
 mod graphing;
 mod lex;
 mod parse;
-mod state;
 
-use crate::state::State;
+use crate::calculator::Calculator;
 
 use anyhow::Result;
 use notify::event::{CreateKind, DataChange, ModifyKind};
@@ -57,7 +57,7 @@ struct App<'s> {
     // which is then passed to a renderer for rendering
     scene: Scene,
 
-    state: State,
+    state: Calculator,
 
     fps_timer: Timer,
 }
@@ -253,7 +253,7 @@ fn main() -> Result<()> {
         renderers: vec![],
         render_state: RenderState::Suspended(None),
         scene: Scene::new(),
-        state: State::new(),
+        state: Calculator::new(),
         fps_timer: Timer::new(10),
     };
 
