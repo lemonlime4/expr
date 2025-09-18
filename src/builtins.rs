@@ -7,6 +7,7 @@ use crate::parse::ArgList;
 pub enum BuiltinFunction {
     Sqrt,
     Abs,
+    Log,
     Ln,
     Exp,
     Sin,
@@ -39,6 +40,7 @@ impl BuiltinFunction {
         Ok(match self {
             Self::Sqrt => call_unary!(f64::sqrt),
             Self::Abs => call_unary!(f64::abs),
+            Self::Log => call_unary!(f64::log10),
             Self::Ln => call_unary!(f64::ln),
             Self::Exp => call_unary!(f64::exp),
             Self::Sin => call_unary!(f64::sin),

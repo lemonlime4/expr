@@ -1,4 +1,6 @@
 -   better background grid
+    -   subdivide major grid cells
+    -   add numbers
 -   clamp line segments to viewport to avoid vello "performance cliff"
 -   resample functions on separate thread
 

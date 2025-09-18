@@ -19,8 +19,10 @@ use crate::parse::Ident;
 
 #[derive(Debug, Clone)]
 pub struct Viewport {
-    pos: Point,
-    graph_width: f64,
+    center: Point,
+    /// Width of viewport in graphpaper units
+    width: f64,
+    /// Actual window's size in pixels
     window_size: Vec2,
 }
 
@@ -30,13 +32,12 @@ impl Viewport {
             Vec2::new(v.x, -v.y)
         }
 
-        self.pos
-            + flip_y(p.to_vec2() - self.window_size / 2.0) * self.graph_width / self.window_size.x
+        self.center + flip_y(p.to_vec2() - self.window_size / 2.0) * self.width / self.window_size.x
     }
 
     pub fn graph_to_window(&self, p: Point) -> Point {
-        let point = p - self.pos;
-        let point = point * self.window_size.x / self.graph_width;
+        let point = p - self.center;
+        let point = point * self.window_size.x / self.width;
         let point = Affine::FLIP_Y * point.to_point();
         let point = point + self.window_size / 2.0;
         point
@@ -44,9 +45,9 @@ impl Viewport {
 
     pub fn new() -> Self {
         Self {
-            pos: Point::ZERO,
+            center: Point::ZERO,
             // pos: Point::new(2.0, 2.0),
-            graph_width: 20.0,
+            width: 20.0,
             // graph_width: 1e-295,
             // graph_width: 0.0000000000001,
             // graph_width: 0.000000000000000000000000000000002,
@@ -54,39 +55,73 @@ impl Viewport {
         }
     }
 
-    fn draw_background(&self, scene: &mut Scene) {
-        let stroke = Stroke::new(1.5);
+    pub fn x_min(&self) -> f64 {
+        self.center.x - self.width / 2.0
+    }
+    pub fn x_max(&self) -> f64 {
+        self.center.x + self.width / 2.0
+    }
+    pub fn y_min(&self) -> f64 {
+        self.center.y - self.height() / 2.0
+    }
+    pub fn y_max(&self) -> f64 {
+        self.center.y + self.height() / 2.0
+    }
+
+    fn draw_axes(&self, scene: &mut Scene) {
+        let stroke = Stroke::new(2.0);
         let color = Color::BLACK;
         scene.stroke(&stroke, ID, color, None, &self.horizontal_line(0.0));
         scene.stroke(&stroke, ID, color, None, &self.vertical_line(0.0));
+    }
 
+    fn draw_background_grid(&self, scene: &mut Scene) {
+        // return;
         let stroke = Stroke::new(1.0);
-        let color = Color::from_rgba8(0, 0, 0, 64);
-        for x in -100..=100 {
-            let x = x as f64;
-            if (x - self.pos.x).abs() >= self.graph_width / 2.0 {
+        let color = Color::from_rgba8(0, 0, 0, 127);
+
+        // let min_major_grid_size = 80.0;
+        let step = self.width / 8.0;
+        let step = 10.0_f64
+            .powf(step.log10().ceil())
+            .min(2.0 * 10.0_f64.powf((0.5_f64.log10() + step.log10()).ceil()))
+            .min(5.0 * 10.0_f64.powf((0.2_f64.log10() + step.log10()).ceil()));
+        let steps = (self.window_size.x / step).ceil();
+        let x_min = (self.x_min() / step).floor() as i64;
+        let x_max = (self.x_max() / step).ceil() as i64;
+        for x in x_min..=x_max {
+            let x = x as f64 * step;
+            if (x - self.center.x).abs() >= self.width / 2.0 {
                 continue;
             }
             scene.stroke(&stroke, ID, color, None, &self.horizontal_line(x));
         }
-        let viewport_height = self.graph_width * self.window_size.y / self.window_size.x;
-        for y in -100..=100 {
-            let y = y as f64;
-            if (y - self.pos.y).abs() >= viewport_height / 2.0 {
+        // let step = round(100.0 * self.height() / self.window_size.y);
+        let y_min = (self.y_min() / step).floor() as i64;
+        let y_max = (self.y_max() / step).ceil() as i64;
+        for y in y_min..=y_max {
+            let y = y as f64 * step;
+            if (y - self.center.y).abs() >= self.height() / 2.0 {
                 continue;
             }
             scene.stroke(&stroke, ID, color, None, &self.vertical_line(y));
         }
+        // println!("x steps: {}", x_max - x_min);
+        // println!("y steps: {}", y_max - y_min);
+    }
+
+    fn height(&self) -> f64 {
+        self.width * self.window_size.y / self.window_size.x
     }
 
     fn horizontal_line(&self, x: f64) -> Line {
-        let x = x - self.pos.x;
-        let x = self.window_size.x * (0.5 + x / self.graph_width);
+        let x = x - self.center.x;
+        let x = self.window_size.x * (0.5 + x / self.width);
         Line::new((x, 0.0), (x, self.window_size.y))
     }
     fn vertical_line(&self, y: f64) -> Line {
-        let viewport_height = self.graph_width * self.window_size.y / self.window_size.x;
-        let y = y - self.pos.y;
+        let viewport_height = self.width * self.window_size.y / self.window_size.x;
+        let y = y - self.center.y;
         let y = self.window_size.y * (0.5 - y / viewport_height);
         Line::new((0.0, y), (self.window_size.x, y))
     }
@@ -154,8 +189,8 @@ impl Calculator {
 
         let (xmin, xmax) = {
             let Viewport {
-                pos: Point { x, .. },
-                graph_width: width,
+                center: Point { x, .. },
+                width,
                 ..
             } = self.viewport;
             (x - width / 2.0, x + width / 2.0)
@@ -188,7 +223,8 @@ impl Calculator {
 
     pub fn render(&self, scene: &mut Scene) {
         // draw background
-        self.viewport.draw_background(scene);
+        self.viewport.draw_axes(scene);
+        self.viewport.draw_background_grid(scene);
 
         // draw functions
         let stroke = Stroke::new(1.0);
@@ -226,9 +262,9 @@ impl Calculator {
         self.cursor = Point::new(pos.x, pos.y);
         if let Some(click_start) = &self.click_start {
             let mut offset = self.cursor - click_start.cursor;
-            offset *= self.viewport.graph_width / self.viewport.window_size.x;
+            offset *= self.viewport.width / self.viewport.window_size.x;
             offset.x = -offset.x;
-            self.viewport.pos = click_start.viewport_pos + offset;
+            self.viewport.center = click_start.viewport_pos + offset;
             self.sample_functions().unwrap(); // TODO
         }
     }
@@ -237,7 +273,7 @@ impl Calculator {
         self.click_start = match mouse_state {
             ElementState::Pressed => Some(ClickStartState {
                 cursor: self.cursor,
-                viewport_pos: self.viewport.pos,
+                viewport_pos: self.viewport.center,
             }),
             ElementState::Released => None,
         }
@@ -251,10 +287,10 @@ impl Calculator {
         };
         let cursor = self.viewport.window_to_graph(self.cursor);
         let cursor = Point::ZERO;
-        let scale = 1.0 - delta.signum() / 10.0;
+        let scale = 1.0 - delta / 10.0;
 
-        self.viewport.graph_width *= scale;
-        self.viewport.pos = cursor + scale * (self.viewport.pos - cursor);
+        self.viewport.width *= scale;
+        self.viewport.center = cursor + scale * (self.viewport.center - cursor);
         if let Some(ClickStartState { viewport_pos, .. }) = &mut self.click_start {
             *viewport_pos = cursor + scale * (*viewport_pos - cursor);
         }
