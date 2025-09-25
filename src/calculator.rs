@@ -286,8 +286,8 @@ impl Calculator {
             MouseScrollDelta::PixelDelta(pos) => pos.y,
         };
         let cursor = self.viewport.window_to_graph(self.cursor);
-        let cursor = Point::ZERO;
-        let scale = 1.0 - delta / 10.0;
+        // let cursor = Point::ZERO; // TODO remove
+        let scale = 1.0 - delta / 5.0;
 
         self.viewport.width *= scale;
         self.viewport.center = cursor + scale * (self.viewport.center - cursor);
