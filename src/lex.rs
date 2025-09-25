@@ -115,13 +115,12 @@ impl<'a> Lexer<'a> {
 
     fn run(mut self) -> Result<Vec<Token>> {
         fn is_whitespace(c: &char) -> bool {
-            c.is_ascii_whitespace() && !"\r\n".contains(*c)
+            c.is_ascii_whitespace() && *c != '\n'
         }
-        self.next_char_while(is_whitespace);
 
+        self.next_char_while(is_whitespace);
         while let (start, Some(c)) = (self.pos, self.next_char()) {
             let token = match c {
-                '\r' if self.next_char_exact('\n') => Token::Newline,
                 '\n' => Token::Newline,
                 ':' if self.next_char_exact('=') => Token::Assign,
                 ')' => Token::RightParen,
@@ -152,6 +151,9 @@ impl<'a> Lexer<'a> {
             };
             self.tokens.push(token);
             self.next_char_while(is_whitespace);
+            if self.next_char_exact('#') {
+                self.next_char_while(|c| *c != '\n');
+            }
         }
 
         Ok(self.tokens)
