@@ -17,6 +17,7 @@ pub enum BuiltinFunction {
     Min,
     Max,
     Mod,
+    Sgn,
 }
 
 impl BuiltinFunction {
@@ -53,7 +54,16 @@ impl BuiltinFunction {
             },
             Self::Min => call_binary!(f64::min),
             Self::Max => call_binary!(f64::max),
-            Self::Mod => call_binary!(|x: f64, y: f64| x - y * (x / y).floor()),
+            Self::Mod => call_binary!(|x, y| x - y * f64::floor(x / y)),
+            Self::Sgn => call_unary!(|x| {
+                use std::cmp::Ordering::*;
+                match f64::partial_cmp(&x, &0.0) {
+                    Some(Less) => -1.0,
+                    Some(Equal) => x,
+                    Some(Greater) => 1.0,
+                    None => x,
+                }
+            }),
         })
     }
 }
