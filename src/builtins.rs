@@ -13,6 +13,8 @@ pub enum BuiltinFunction {
     Sin,
     Cos,
     Tan,
+    Asin,
+    Acos,
     Atan,
     Min,
     Max,
@@ -22,7 +24,7 @@ pub enum BuiltinFunction {
 
 impl BuiltinFunction {
     pub fn call(&self, args: ArgList<f64>) -> Result<f64> {
-        macro_rules! call_unary {
+        macro_rules! unary {
             ($func:expr) => {
                 match args.as_slice() {
                     [x] => $func(*x),
@@ -39,23 +41,47 @@ impl BuiltinFunction {
             };
         }
         Ok(match self {
-            Self::Sqrt => call_unary!(f64::sqrt),
-            Self::Abs => call_unary!(f64::abs),
-            Self::Log => call_unary!(f64::log10),
-            Self::Ln => call_unary!(f64::ln),
-            Self::Exp => call_unary!(f64::exp),
-            Self::Sin => call_unary!(f64::sin),
-            Self::Cos => call_unary!(f64::cos),
-            Self::Tan => call_unary!(f64::tan),
+            Self::Sqrt => unary!(f64::sqrt),
+            Self::Abs => unary!(f64::abs),
+            Self::Log => unary!(f64::log10),
+            Self::Ln => unary!(f64::ln),
+            Self::Exp => unary!(f64::exp),
+            Self::Sin => unary!(f64::sin),
+            Self::Cos => unary!(f64::cos),
+            Self::Asin => unary!(f64::asin),
+            Self::Acos => unary!(f64::acos),
+            Self::Tan => unary!(f64::tan),
             Self::Atan => match args.as_slice() {
                 [x] => x.atan(),
                 [y, x] => y.atan2(*x),
                 _ => bail!("atan takes 1 or 2 arguments but got {}", args.len()),
             },
-            Self::Min => call_binary!(f64::min),
-            Self::Max => call_binary!(f64::max),
+            Self::Min => {
+                if args.is_empty() {
+                    bail!("min cannot take no arguments")
+                }
+                args.iter().fold(f64::INFINITY, |x, &y| {
+                    if x.is_nan() || y.is_nan() {
+                        f64::NAN
+                    } else {
+                        x.min(y)
+                    }
+                })
+            }
+            Self::Max => {
+                if args.is_empty() {
+                    bail!("min cannot take no arguments")
+                }
+                args.iter().fold(-f64::INFINITY, |x, &y| {
+                    if x.is_nan() || y.is_nan() {
+                        f64::NAN
+                    } else {
+                        x.max(y)
+                    }
+                })
+            }
             Self::Mod => call_binary!(|x, y| x - y * f64::floor(x / y)),
-            Self::Sgn => call_unary!(|x| {
+            Self::Sgn => unary!(|x| {
                 use std::cmp::Ordering::*;
                 match f64::partial_cmp(&x, &0.0) {
                     Some(Less) => -1.0,
