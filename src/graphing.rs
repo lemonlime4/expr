@@ -62,10 +62,26 @@ pub fn sample_single_var_function(
         need_resampling.resize(samples.len() - 1, false);
 
         for (i, (p1, p2, p3)) in samples.iter().map(|s| s.p).tuple_windows().enumerate() {
-            if (p1 - p2).normalize().dot((p3 - p2).normalize()) > min_angle.to_radians().cos() {
-                need_resampling[i] = true;
-                need_resampling[i + 1] = true;
-                resampled = true;
+            match (p1.is_finite(), p2.is_finite(), p3.is_finite()) {
+                (true, true, true) => {
+                    if (p1 - p2).normalize().dot((p3 - p2).normalize())
+                        > min_angle.to_radians().cos()
+                    {
+                        need_resampling[i] = true;
+                        need_resampling[i + 1] = true;
+                        resampled = true;
+                    }
+                }
+                (f1, f2, f3) => {
+                    if f1 != f2 {
+                        need_resampling[i] = true;
+                        resampled = true;
+                    }
+                    if f2 != f3 {
+                        need_resampling[i + 1] = true;
+                        resampled = true;
+                    }
+                }
             }
         }
         if i == subsamples {

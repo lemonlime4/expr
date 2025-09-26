@@ -204,18 +204,12 @@ impl Calculator {
                 (self.viewport.window_size.x / 10.0).ceil() as u32,
                 |x| {
                     arg_map.insert(arg.clone(), x);
-                    let y = self
-                        .interpreter
+                    self.interpreter
                         .evaluate(body, &arg_map)
-                        .unwrap_or(f64::NAN);
-                    if y.is_finite() { y } else { 0.0 }
+                        .unwrap_or(f64::NAN)
                 },
                 |p| self.viewport.graph_to_window(p),
             );
-            // path.move_to(points[0]);
-            // for point in &points[1..] {
-            //     path.line_to(*point);
-            // }
             self.sampled_functions.push((*color, points));
         }
         Ok(())
@@ -223,25 +217,34 @@ impl Calculator {
 
     pub fn render(&self, scene: &mut Scene) {
         // draw background
-        self.viewport.draw_axes(scene);
+        // self.viewport.draw_axes(scene);
         self.viewport.draw_background_grid(scene);
 
         // draw functions
-        let stroke = Stroke::new(1.0);
+        let stroke = Stroke::new(5.0);
         let fill = Fill::NonZero;
         for (color, points) in self.sampled_functions.iter() {
             let mut path = BezPath::new();
-            path.move_to(points[0]);
-            for p in &points[1..] {
-                path.line_to(*p);
+            let mut new_segment = true;
+            for &p in points {
+                if p.y.is_finite() {
+                    if new_segment {
+                        path.move_to(p);
+                        new_segment = false;
+                    } else {
+                        path.line_to(p);
+                    }
+                } else {
+                    new_segment = true;
+                }
             }
             scene.stroke(&stroke, ID, color, None, &path);
 
-            for p in points {
-                let (radius, color) = (1.5, color);
-                let circle = Circle::new(*p, radius);
-                scene.fill(fill, ID, color, None, &circle);
-            }
+            // for p in points {
+            //     let (radius, color) = (1.5, color);
+            //     let circle = Circle::new(*p, radius);
+            //     scene.fill(fill, ID, color, None, &circle);
+            // }
         }
 
         // scene.fill(
