@@ -74,8 +74,12 @@ impl Viewport {
     fn draw_axes(&self, scene: &mut Scene) {
         let stroke = Stroke::new(2.0);
         let color = Color::BLACK;
-        scene.stroke(&stroke, ID, color, None, &self.horizontal_line(0.0));
-        scene.stroke(&stroke, ID, color, None, &self.vertical_line(0.0));
+        if self.x_min() <= 0.0 && 0.0 <= self.x_max() {
+            scene.stroke(&stroke, ID, color, None, &self.horizontal_line(0.0));
+        }
+        if self.y_min() <= 0.0 && 0.0 <= self.y_max() {
+            scene.stroke(&stroke, ID, color, None, &self.vertical_line(0.0));
+        }
     }
 
     fn draw_background_grid(&self, scene: &mut Scene) {
@@ -231,7 +235,7 @@ impl Calculator {
 
     pub fn render(&self, scene: &mut Scene) {
         // draw background
-        // self.viewport.draw_axes(scene);
+        self.viewport.draw_axes(scene);
         self.viewport.draw_background_grid(scene);
 
         // draw functions
