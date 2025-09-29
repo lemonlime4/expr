@@ -1,4 +1,5 @@
 -   exp(-x^2) causes lag
+-   mysterious gap on left of first plotted function
 
 -   better background grid
     -   make it actually dependent on pixel count
