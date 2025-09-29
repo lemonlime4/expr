@@ -330,7 +330,7 @@ fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
     let attr = Window::default_attributes()
         .with_min_inner_size(LogicalSize::new(300, 200))
         .with_resizable(true)
-        .with_title("Vello Shapes");
+        .with_title("Fake desmos");
     let window = event_loop.create_window(attr).unwrap();
     let size = window.primary_monitor().unwrap().size();
     window.set_outer_position(PhysicalPosition { x: 0, y: 0 });
