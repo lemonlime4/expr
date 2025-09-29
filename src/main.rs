@@ -180,7 +180,7 @@ impl ApplicationHandler<String> for App<'_> {
                 is_synthetic,
                 ..
             } => {
-                self.state.draw_points = !self.state.draw_points;
+                self.state.draw_debug = !self.state.draw_debug;
             }
 
             WindowEvent::RedrawRequested => {

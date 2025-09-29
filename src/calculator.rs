@@ -151,7 +151,7 @@ pub struct Calculator {
     cursor: Point,
     click_start: Option<ClickStartState>,
     interpreter: Interpreter,
-    pub draw_points: bool,
+    pub draw_debug: bool,
 }
 
 impl Calculator {
@@ -165,7 +165,7 @@ impl Calculator {
             cursor: Point::ZERO,
             click_start: None,
             interpreter: Interpreter::new(),
-            draw_points: true,
+            draw_debug: false,
         }
     }
 
@@ -235,7 +235,7 @@ impl Calculator {
         self.viewport.draw_background_grid(scene);
 
         // draw functions
-        let stroke = Stroke::new(if self.draw_points { 1.0 } else { 5.0 });
+        let stroke = Stroke::new(if self.draw_debug { 1.0 } else { 5.0 });
         let fill = Fill::NonZero;
         let mut last_p: Option<Point> = None;
         for (color, points) in self.sampled_functions.iter() {
@@ -265,7 +265,7 @@ impl Calculator {
             }
             scene.stroke(&stroke, ID, color, None, &path);
 
-            if !self.draw_points {
+            if !self.draw_debug {
                 continue;
             }
             for p in points {
