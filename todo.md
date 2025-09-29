@@ -1,4 +1,7 @@
+-   exp(-x^2) causes lag
+
 -   better background grid
+    -   make it actually dependent on pixel count
     -   subdivide major grid cells
     -   add numbers
 -   clamp line segments to viewport to avoid vello "performance cliff"
