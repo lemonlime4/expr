@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 use std::f64;
+use std::sync::Arc;
 use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
+use std::thread::ScopedJoinHandle;
 use std::time::Instant;
 
 use anyhow::Result;
 use vello::Scene;
-use vello::kurbo::*;
+use vello::kurbo::{Affine, BezPath, Circle, Line, Point, Stroke, Vec2};
 use vello::peniko::*;
 use winit::dpi::PhysicalPosition;
 use winit::event::ElementState;
@@ -132,6 +135,15 @@ struct ClickStartState {
     viewport_pos: Point,
 }
 
+enum SampleInfo {
+    SingleVar {
+        min: f64,
+        max: f64,
+        initial_segment_count: u32,
+        f: Box<dyn Fn(f64) -> f64>,
+    },
+}
+
 pub struct Calculator {
     viewport: Viewport,
     pub single_var_functions: Vec<(Color, Ident, Expr)>,
@@ -139,6 +151,7 @@ pub struct Calculator {
     cursor: Point,
     click_start: Option<ClickStartState>,
     interpreter: Interpreter,
+    pub draw_points: bool,
 }
 
 impl Calculator {
@@ -152,6 +165,7 @@ impl Calculator {
             cursor: Point::ZERO,
             click_start: None,
             interpreter: Interpreter::new(),
+            draw_points: true,
         }
     }
 
@@ -221,7 +235,7 @@ impl Calculator {
         self.viewport.draw_background_grid(scene);
 
         // draw functions
-        let stroke = Stroke::new(5.0);
+        let stroke = Stroke::new(1.0);
         let fill = Fill::NonZero;
         for (color, points) in self.sampled_functions.iter() {
             let mut path = BezPath::new();
@@ -240,11 +254,14 @@ impl Calculator {
             }
             scene.stroke(&stroke, ID, color, None, &path);
 
-            // for p in points {
-            //     let (radius, color) = (1.5, color);
-            //     let circle = Circle::new(*p, radius);
-            //     scene.fill(fill, ID, color, None, &circle);
-            // }
+            if !self.draw_points {
+                continue;
+            }
+            for p in points {
+                let (radius, color) = (1.5, color);
+                let circle = Circle::new(*p, radius);
+                scene.fill(fill, ID, color, None, &circle);
+            }
         }
 
         // scene.fill(

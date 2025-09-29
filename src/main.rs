@@ -12,16 +12,17 @@ use anyhow::Result;
 use notify::event::{CreateKind, DataChange, ModifyKind};
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use std::path::Path;
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
+use std::sync::{Condvar, mpsc};
 use std::time::{Duration, Instant};
 use vello::peniko::color::palette;
 use vello::util::{RenderContext, RenderSurface};
 use vello::{AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalPosition, PhysicalSize};
-use winit::event::{MouseButton, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::keyboard::{Key, NamedKey};
 use winit::window::Window;
 
 use vello::wgpu;
@@ -169,6 +170,19 @@ impl ApplicationHandler<String> for App<'_> {
                 self.state.handle_scroll(delta);
             }
 
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        logical_key: Key::Named(NamedKey::Shift),
+                        state: ElementState::Pressed,
+                        ..
+                    },
+                is_synthetic,
+                ..
+            } => {
+                self.state.draw_points = !self.state.draw_points;
+            }
+
             WindowEvent::RedrawRequested => {
                 window.request_redraw();
                 // Empty the scene of objects to draw. You could create a new Scene each time, but in this case
@@ -256,6 +270,7 @@ fn main() -> Result<()> {
         state: Calculator::new(),
         fps_timer: Timer::new(10),
     };
+    let sampling_thread = std::thread::spawn(move || {});
 
     let event_loop = EventLoop::<String>::with_user_event().build()?;
     let proxy = event_loop.create_proxy();
