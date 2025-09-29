@@ -1,0 +1,12 @@
+PI := 3 + sin(3) + sin(3 + sin(3)) + sin(3 + sin(3) + sin(3 + sin(3)))
+
+f(x, y) := (x - y) / (x + y)
+h(x) := ln(abs(x)) * sgn(x)
+
+# try uncommenting the following functions
+
+h(f(1, x / 2))
+min( -(x^2 / 100 - 1) , -sin(x), -( 10 * 0.1^(x^2) - 1) ) - 1
+exp(1) - sqrt(sin(PI * x))
+x * sin(3 * ln(abs(x)))
+max(0,min(1, mod(x,3) - 1 )) - 3
