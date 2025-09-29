@@ -235,22 +235,33 @@ impl Calculator {
         self.viewport.draw_background_grid(scene);
 
         // draw functions
-        let stroke = Stroke::new(1.0);
+        let stroke = Stroke::new(if self.draw_points { 1.0 } else { 5.0 });
         let fill = Fill::NonZero;
+        let mut last_p: Option<Point> = None;
         for (color, points) in self.sampled_functions.iter() {
             let mut path = BezPath::new();
             let mut new_segment = true;
+            const MAX_SLOPE: f64 = 1e4;
             for &p in points {
                 if p.y.is_finite() {
-                    if new_segment {
-                        path.move_to(p);
-                        new_segment = false;
+                    // detect discontinuity
+                    if let Some(p0) = last_p
+                        && (p.y - p0.y) / (p.x - p0.x) <= MAX_SLOPE
+                    {
+                        if new_segment {
+                            path.move_to(p);
+                            new_segment = false;
+                        } else {
+                            path.line_to(p);
+                        }
                     } else {
-                        path.line_to(p);
+                        new_segment = true;
                     }
                 } else {
                     new_segment = true;
                 }
+
+                last_p = Some(p);
             }
             scene.stroke(&stroke, ID, color, None, &path);
 

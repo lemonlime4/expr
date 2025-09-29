@@ -52,11 +52,11 @@ pub fn sample_single_var_function(
         };
         samples.push(Sample::new(x, f(x), &graph_to_window));
     }
-    let min_angle: f64 = 170.0;
+    const MIN_ANGLE: f64 = 177.0;
     let mut need_resampling = Vec::new();
 
-    let subsamples = 5;
-    for i in 0..subsamples + 1 {
+    const SUBSAMPLES: i32 = 12;
+    for _ in 0..SUBSAMPLES + 1 {
         let mut resampled = false;
         need_resampling.clear();
         need_resampling.resize(samples.len() - 1, false);
@@ -65,7 +65,7 @@ pub fn sample_single_var_function(
             match (p1.is_finite(), p2.is_finite(), p3.is_finite()) {
                 (true, true, true) => {
                     if (p1 - p2).normalize().dot((p3 - p2).normalize())
-                        > min_angle.to_radians().cos()
+                        > MIN_ANGLE.to_radians().cos()
                     {
                         need_resampling[i] = true;
                         need_resampling[i + 1] = true;
@@ -83,9 +83,6 @@ pub fn sample_single_var_function(
                     }
                 }
             }
-        }
-        if i == subsamples {
-            break;
         }
         if !resampled {
             break;
