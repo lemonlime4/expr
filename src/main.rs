@@ -193,7 +193,7 @@ impl ApplicationHandler<String> for App<'_> {
                 let height = surface.config.height;
 
                 // Re-add the objects to draw to the scene.
-                self.state.sample_functions(); // TODO remove
+                // self.state.sample_functions(); // TODO remove
                 self.state.render(&mut self.scene);
                 self.fps_timer.stop_measure();
                 eprint!(
