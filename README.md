@@ -8,6 +8,8 @@ Install the Cargo package manager and run `cargo run --release` in the repo's to
 
 Edit `input.txt` and save to reload.
 
+Press shift to toggle debug view of the functions.
+
 ## Bugs
 
 See `todo.md`
