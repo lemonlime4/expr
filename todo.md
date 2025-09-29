@@ -4,7 +4,7 @@
 -   clamp line segments to viewport to avoid vello "performance cliff"
 -   resample functions on separate thread
 
--   figure out why sometimes reads empty file
+-   figure out why `input.txt` sometimes reads empty file
 
 -   optimize x^2 (and add special behavior for fractions?)
 -   improve the runtime
