@@ -262,15 +262,30 @@ impl ApplicationHandler<String> for App<'_> {
 }
 
 fn main() -> Result<()> {
+    let sample_tx = Arc::new((Mutex::new(None), Condvar::new()));
+    let sample_rx = sample_tx.clone();
+    let sampled_tx = Arc::new(Mutex::new(None));
+    let sampled_rx = sampled_tx.clone();
     let mut app = App {
         context: RenderContext::new(),
         renderers: vec![],
         render_state: RenderState::Suspended(None),
         scene: Scene::new(),
-        state: Calculator::new(),
+        state: Calculator::new(sample_tx, sampled_rx),
         fps_timer: Timer::new(10),
     };
-    let sampling_thread = std::thread::spawn(move || {});
+
+    let sampling_thread = std::thread::spawn(move || {
+        let (mutex, cvar) = sample_rx.as_ref();
+        loop {
+            let sample_info = cvar.wait(mutex.lock().unwrap()).unwrap().take().unwrap();
+            let result = graphing::sample_functions(sample_info);
+
+            let mut sampled_functions = sampled_tx.lock().unwrap();
+            *sampled_functions = Some(result);
+            cvar.notify_one();
+        }
+    });
 
     let event_loop = EventLoop::<String>::with_user_event().build()?;
     let proxy = event_loop.create_proxy();

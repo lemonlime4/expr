@@ -1,6 +1,10 @@
+use std::cell::Cell;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::f64;
 use std::sync::Arc;
+use std::sync::Condvar;
+use std::sync::Mutex;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::thread::ScopedJoinHandle;
@@ -17,16 +21,17 @@ use winit::event::MouseScrollDelta;
 use crate::eval::Interpreter;
 use crate::eval::Output;
 use crate::graphing;
+use crate::graphing::SampleInfo;
 use crate::parse::Expr;
 use crate::parse::Ident;
 
 #[derive(Debug, Clone)]
 pub struct Viewport {
-    center: Point,
+    pub center: Point,
     /// Width of viewport in graphpaper units
-    width: f64,
+    pub width: f64,
     /// Actual window's size in pixels
-    window_size: Vec2,
+    pub window_size: Vec2,
 }
 
 impl Viewport {
@@ -139,37 +144,34 @@ struct ClickStartState {
     viewport_pos: Point,
 }
 
-enum SampleInfo {
-    SingleVar {
-        min: f64,
-        max: f64,
-        initial_segment_count: u32,
-        f: Box<dyn Fn(f64) -> f64>,
-    },
-}
-
+// arcs are never read mutably nor used by Calculator, only sent
 pub struct Calculator {
     viewport: Viewport,
-    pub single_var_functions: Vec<(Color, Ident, Expr)>,
-    sampled_functions: Vec<(Color, Vec<Point>)>,
+    pub single_var_functions: Arc<[(Color, Ident, Expr)]>,
     cursor: Point,
     click_start: Option<ClickStartState>,
-    interpreter: Interpreter,
+    interpreter: Arc<Interpreter>,
     pub draw_debug: bool,
+    sample_tx: Arc<(Mutex<Option<SampleInfo>>, Condvar)>,
+    sampled_functions: RefCell<Vec<(Color, Vec<Point>)>>,
+    sampled_rx: Arc<Mutex<Option<Vec<(Color, Vec<Point>)>>>>,
 }
 
 impl Calculator {
-    pub fn new() -> Self {
-        let mut single_var_functions = Vec::new();
-
+    pub fn new(
+        sample_tx: Arc<(Mutex<Option<SampleInfo>>, Condvar)>,
+        sampled_rx: Arc<Mutex<Option<Vec<(Color, Vec<Point>)>>>>,
+    ) -> Self {
         Self {
             viewport: Viewport::new(),
-            single_var_functions,
-            sampled_functions: Vec::new(),
+            single_var_functions: Arc::new([]),
             cursor: Point::ZERO,
             click_start: None,
-            interpreter: Interpreter::new(),
+            interpreter: Arc::new(Interpreter::new()),
             draw_debug: false,
+            sample_tx,
+            sampled_functions: RefCell::new(Vec::new()),
+            sampled_rx,
         }
     }
 
@@ -182,54 +184,38 @@ impl Calculator {
             Color::from_rgb8(0, 0, 0),
         ];
 
-        self.interpreter = interpreter;
-        self.single_var_functions = Vec::new();
-        for ((arg, body), color) in output
+        self.interpreter = Arc::new(interpreter);
+        self.single_var_functions = output
             .single_var_functions
-            .iter()
+            .into_iter()
             .zip(COLORS.iter().copied().cycle())
-        {
-            self.single_var_functions
-                .push((color, arg.clone(), body.clone()));
-        }
+            .map(|((arg, body), color)| (color, arg, body))
+            .collect();
         self.sample_functions();
     }
 
     pub fn sample_functions(&mut self) -> Result<()> {
-        self.sampled_functions.clear();
-        if let Some(n) = self
-            .single_var_functions
-            .len()
-            .checked_sub(self.sampled_functions.capacity())
         {
-            self.sampled_functions.reserve_exact(n);
+            let mut sampled_functions = self.sampled_functions.borrow_mut();
+            sampled_functions.clear();
+            if let Some(n) = self
+                .single_var_functions
+                .len()
+                .checked_sub(sampled_functions.capacity())
+            {
+                sampled_functions.reserve_exact(n);
+            }
         }
 
-        let (xmin, xmax) = {
-            let Viewport {
-                center: Point { x, .. },
-                width,
-                ..
-            } = self.viewport;
-            (x - width / 2.0, x + width / 2.0)
-        };
-        let mut arg_map = HashMap::new();
+        let (mutex, cvar) = self.sample_tx.as_ref();
+        let mut sample_info = mutex.lock().unwrap();
+        *sample_info = Some(SampleInfo {
+            viewport: self.viewport.clone(),
+            functions: self.single_var_functions.clone(),
+            interpreter: self.interpreter.clone(),
+        });
+        cvar.notify_one();
 
-        for (color, arg, body) in self.single_var_functions.iter() {
-            let points = graphing::sample_single_var_function(
-                xmin,
-                xmax,
-                (self.viewport.window_size.x / 10.0).ceil() as u32,
-                |x| {
-                    arg_map.insert(arg.clone(), x);
-                    self.interpreter
-                        .evaluate(body, &arg_map)
-                        .unwrap_or(f64::NAN)
-                },
-                |p| self.viewport.graph_to_window(p),
-            );
-            self.sampled_functions.push((*color, points));
-        }
         Ok(())
     }
 
@@ -239,33 +225,39 @@ impl Calculator {
         self.viewport.draw_background_grid(scene);
 
         // draw functions
+        if let Some(sampled_functions) = self
+            .sampled_rx
+            .try_lock()
+            .ok()
+            .and_then(|mut lock| lock.take())
+        {
+            self.sampled_functions.replace(sampled_functions);
+        }
         let stroke = Stroke::new(if self.draw_debug { 1.0 } else { 5.0 });
         let fill = Fill::NonZero;
-        let mut last_p: Option<Point> = None;
-        for (color, points) in self.sampled_functions.iter() {
+        for (color, points) in self.sampled_functions.borrow().iter() {
             let mut path = BezPath::new();
             let mut new_segment = true;
+            let mut p0: Point = points[0];
+            if p0.y.is_finite() {
+                path.move_to(p0);
+                new_segment = false;
+            }
             const MAX_SLOPE: f64 = 1e4;
             for &p in points {
                 if p.y.is_finite() {
                     // detect discontinuity
-                    if let Some(p0) = last_p
-                        && (p.y - p0.y) / (p.x - p0.x) <= MAX_SLOPE
-                    {
-                        if new_segment {
-                            path.move_to(p);
-                            new_segment = false;
-                        } else {
-                            path.line_to(p);
-                        }
+                    if !new_segment && ((p.y - p0.y) / (p.x - p0.x)).abs() <= MAX_SLOPE {
+                        path.line_to(p);
                     } else {
-                        new_segment = true;
+                        path.move_to(p);
+                        new_segment = false;
                     }
                 } else {
                     new_segment = true;
                 }
 
-                last_p = Some(p);
+                p0 = p;
             }
             scene.stroke(&stroke, ID, color, None, &path);
 

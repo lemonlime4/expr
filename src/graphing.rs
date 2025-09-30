@@ -1,6 +1,59 @@
 use itertools::Itertools;
-use std::collections::{BTreeSet, HashMap};
-use vello::kurbo::*;
+use std::{
+    collections::{BTreeSet, HashMap},
+    sync::Arc,
+};
+use vello::{
+    kurbo::{Point, Vec2},
+    peniko::Color,
+};
+
+use crate::{
+    calculator::Viewport,
+    eval::Interpreter,
+    parse::{Expr, Ident},
+};
+
+pub struct SampleInfo {
+    pub viewport: Viewport,
+    pub functions: Arc<[(Color, Ident, Expr)]>,
+    pub interpreter: Arc<Interpreter>,
+}
+
+pub fn sample_functions(
+    SampleInfo {
+        viewport,
+        functions,
+        interpreter,
+    }: SampleInfo,
+) -> Vec<(Color, Vec<Point>)> {
+    let (xmin, xmax) = {
+        let Viewport {
+            center: Point { x, .. },
+            width,
+            ..
+        } = viewport;
+        (x - width / 2.0, x + width / 2.0)
+    };
+    let mut arg_map = HashMap::new();
+
+    functions
+        .iter()
+        .map(|(color, arg, body)| {
+            let points = sample_single_var_function(
+                xmin,
+                xmax,
+                (viewport.window_size.x / 10.0).ceil() as u32,
+                |x| {
+                    arg_map.insert(arg.clone(), x);
+                    interpreter.evaluate(body, &arg_map).unwrap_or(f64::NAN)
+                },
+                |p| viewport.graph_to_window(p),
+            );
+            (*color, points)
+        })
+        .collect()
+}
 
 pub fn sample_single_var_function(
     xmin: f64,
