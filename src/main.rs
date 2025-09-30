@@ -283,7 +283,6 @@ fn main() -> Result<()> {
 
             let mut sampled_functions = sampled_tx.lock().unwrap();
             *sampled_functions = Some(result);
-            cvar.notify_one();
         }
     });
 
