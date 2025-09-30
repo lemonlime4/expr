@@ -195,18 +195,6 @@ impl Calculator {
     }
 
     pub fn sample_functions(&mut self) -> Result<()> {
-        {
-            let mut sampled_functions = self.sampled_functions.borrow_mut();
-            sampled_functions.clear();
-            if let Some(n) = self
-                .single_var_functions
-                .len()
-                .checked_sub(sampled_functions.capacity())
-            {
-                sampled_functions.reserve_exact(n);
-            }
-        }
-
         let (mutex, cvar) = self.sample_tx.as_ref();
         let mut sample_info = mutex.lock().unwrap();
         *sample_info = Some(SampleInfo {
