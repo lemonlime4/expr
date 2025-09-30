@@ -1,5 +1,4 @@
 -   exp(-x^2) causes lag
--   `Condvar` notification is thrown away when no thread waiting
 -   sampled functions should be in graph space and not viewport space
 
 -   better background grid

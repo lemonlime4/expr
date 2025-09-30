@@ -233,6 +233,7 @@ impl Calculator {
             }
             const MAX_SLOPE: f64 = 1e4;
             for &p in points {
+                let p = p;
                 if p.y.is_finite() {
                     // detect discontinuity
                     if !new_segment && ((p.y - p0.y) / (p.x - p0.x)).abs() <= MAX_SLOPE {

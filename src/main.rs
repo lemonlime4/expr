@@ -196,13 +196,10 @@ impl ApplicationHandler<String> for App<'_> {
                 // self.state.sample_functions(); // TODO remove
                 self.state.render(&mut self.scene);
                 self.fps_timer.stop_measure();
-                eprint!(
-                    "{}",
-                    format!(
-                        "\rrendering: {} ms              ",
-                        self.fps_timer.average_duration().round()
-                    )
-                );
+                // eprint!(
+                //     "\rrendering: {} ms              ",
+                //     self.fps_timer.average_duration().round()
+                // );
                 self.fps_timer.start_measure();
 
                 // Get a handle to the device
@@ -278,7 +275,11 @@ fn main() -> Result<()> {
     let sampling_thread = std::thread::spawn(move || {
         let (mutex, cvar) = sample_rx.as_ref();
         loop {
-            let sample_info = cvar.wait(mutex.lock().unwrap()).unwrap().take().unwrap();
+            let sample_info = cvar
+                .wait_while(mutex.lock().unwrap(), |x| x.is_none())
+                .unwrap()
+                .take()
+                .unwrap();
             let result = graphing::sample_functions(sample_info);
 
             let mut sampled_functions = sampled_tx.lock().unwrap();
