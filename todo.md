@@ -17,11 +17,16 @@
     -   desmos puts two segments on left and right of a discontinuous point, anything to do with that?
 -   optimize x^2 (and add special behavior for fractions?)
 -   improve the runtime
--   better (order independent) name resolution
 
+-   zooming in very fast causes lag
+-   background flashes and disappears during lag
+
+-   better (order independent) name resolution
 -   sliders
 -   point and list types
 -   implicits, parametrics, points, polygons
 
+-   better parsing errors
+    -   example: 0x says expected newline
 -   make errors properly display
 -   diagnose multiple independent errors at the same time
