@@ -200,6 +200,9 @@ impl Parser {
 
     pub fn parse(&mut self) -> Result<Vec<TopLevelItem>> {
         let mut items = Vec::new();
+        while self.peek() == Some(&Token::Newline) {
+            self.next();
+        }
         loop {
             if self.peek().is_none() {
                 break;
