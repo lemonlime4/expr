@@ -25,6 +25,15 @@ impl BinaryOp {
             Self::Power => 3,
         }
     }
+    pub fn greater_binding_power(&self, last_op: &Self) -> bool {
+        let r = self.binding_power();
+        let l = last_op.binding_power();
+        let r_left_associative = match self {
+            Self::Power => false,
+            _ => true,
+        };
+        if r_left_associative { l < r } else { l <= r }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -136,30 +145,57 @@ impl Parser {
             Some(t) => bail!("unknown token {t:?}"),
             None => bail!("cannot parse empty expression"),
         };
-        for sign in signs {
-            let op = match sign {
-                true => UnaryOp::Negate,
-                false => UnaryOp::Plus,
-            };
-            left = Expr::un_op(op, left);
+        // TODO find a less hacky way
+        let mut signs = Some(signs);
+        if self.peek() != Some(&Token::Power) {
+            for sign in signs.take().unwrap() {
+                let op = match sign {
+                    true => UnaryOp::Negate,
+                    false => UnaryOp::Plus,
+                };
+                left = Expr::un_op(op, left);
+            }
         }
-        loop {
+        left = loop {
             let op = match self.peek() {
                 Some(Token::Plus) => BinaryOp::Add,
                 Some(Token::Minus) => BinaryOp::Subtract,
                 Some(Token::Cdot) => BinaryOp::DotProduct,
                 Some(Token::Slash) => BinaryOp::Divide,
                 Some(Token::Power) => BinaryOp::Power,
-                _ => break Ok(left),
+                _ => {
+                    if let Some(signs) = signs.take() {
+                        for sign in signs {
+                            let op = match sign {
+                                true => UnaryOp::Negate,
+                                false => UnaryOp::Plus,
+                            };
+                            left = Expr::un_op(op, left);
+                        }
+                    }
+                    break left;
+                }
             };
-            if Some(op.binding_power()) > last_op.map(|op| op.binding_power()) {
+            if let Some(last_op) = last_op
+                && !op.greater_binding_power(&last_op)
+            {
+                break left;
+            } else {
                 self.next();
                 let right = self.parse_expr(Some(op))?;
                 left = Expr::bin_op(op, left, right);
-            } else {
-                break Ok(left);
+            }
+        };
+        if let Some(signs) = signs.take() {
+            for sign in signs {
+                let op = match sign {
+                    true => UnaryOp::Negate,
+                    false => UnaryOp::Plus,
+                };
+                left = Expr::un_op(op, left);
             }
         }
+        Ok(left)
     }
 
     pub fn parse(&mut self) -> Result<Vec<TopLevelItem>> {
