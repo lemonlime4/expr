@@ -308,7 +308,9 @@ fn main() -> Result<()> {
             last_event_time = Instant::now();
 
             let Some((path, input)) = paths.into_iter().rev().find_map(|path| {
-                match std::fs::read_to_string(path.as_path()) {
+                // Printing it causes always successful read for some reason
+                // println!("{}", path.display());
+                match std::fs::read_to_string("input.txt" /*path.as_path()*/) {
                     Ok(string) => Some((path, string)),
                     Err(_) => None,
                 }
