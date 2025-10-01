@@ -358,6 +358,13 @@ impl<T> ArgList<T> {
     pub fn push(&mut self, value: T) {
         self.0.push(value)
     }
+    pub fn from_vec(vec: Vec<T>) -> Option<Self> {
+        if vec.is_empty() {
+            None
+        } else {
+            Some(Self(vec))
+        }
+    }
 }
 
 impl<T> std::ops::Deref for ArgList<T> {

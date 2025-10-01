@@ -80,7 +80,18 @@ impl Interpreter {
                 if body.contains_func(name.as_str()) {
                     bail!("Function '{name}' cannot recursively call itself");
                 }
+                let args_len = args.len();
+                let name_c = name.clone();
                 self.bindings.insert(name, Binding::Function { args, body });
+                // a hack to catch any errors inside functions
+                // TODO: use a better function representation
+                self.evaluate(
+                    &Expr::Call {
+                        func: name_c,
+                        args: ArgList::from_vec((vec![Expr::Lit(0.0); args_len])).unwrap(),
+                    },
+                    &HashMap::new(),
+                )?;
             }
         }
         Ok(())
