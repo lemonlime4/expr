@@ -33,3 +33,5 @@ Note that multiline expressions aren't supported yet.
     -   this is caused by drawing lines far away from the viewport
     -   zooming very quickly can also cause this for some reason
 -   rectangular rendering artifacts can appear when drawing dense functions like `sin(100/x)`
+-   parts of functions that are very vertical (slope of >1000) will not be drawn
+    -   this is because they're treated as discontinuities
