@@ -90,18 +90,27 @@ impl Viewport {
     fn draw_background_grid(&self, scene: &mut Scene) {
         // return;
         let stroke = Stroke::new(1.0);
-        let color = Color::from_rgba8(0, 0, 0, 127);
+        let major_color = Color::from_rgba8(0, 0, 0, 128);
+        let minor_color = Color::from_rgba8(0, 0, 0, 32);
 
         // let min_major_grid_size = 80.0;
-        let step = self.width / 8.0;
-        let step = 10.0_f64
-            .powf(step.log10().ceil())
-            .min(2.0 * 10.0_f64.powf((0.5_f64.log10() + step.log10()).ceil()))
-            .min(5.0 * 10.0_f64.powf((0.2_f64.log10() + step.log10()).ceil()));
-        let steps = (self.window_size.x / step).ceil();
-        let x_min = (self.x_min() / step).floor() as i64;
+        let size = self.width / 8.0;
+        let major_step = 10.0_f64
+            .powf(size.log10().ceil())
+            .min(2.0 * 10.0_f64.powf((0.5_f64.log10() + size.log10()).ceil()))
+            .min(5.0 * 10.0_f64.powf((0.2_f64.log10() + size.log10()).ceil()));
+        let substeps = match 10.0_f64.powf(size.log10().rem_euclid(1.0)) {
+            2.0..=5.0 => 4,
+            _ => 5,
+        };
+        let step = major_step / substeps as f64;
+        let x_min: i64 = (self.x_min() / step).floor() as i64;
         let x_max = (self.x_max() / step).ceil() as i64;
         for x in x_min..=x_max {
+            let color = match x.rem_euclid(substeps) {
+                0 => major_color,
+                _ => minor_color,
+            };
             let x = x as f64 * step;
             if (x - self.center.x).abs() >= self.width / 2.0 {
                 continue;
@@ -112,6 +121,10 @@ impl Viewport {
         let y_min = (self.y_min() / step).floor() as i64;
         let y_max = (self.y_max() / step).ceil() as i64;
         for y in y_min..=y_max {
+            let color = match y.rem_euclid(substeps) {
+                0 => major_color,
+                _ => minor_color,
+            };
             let y = y as f64 * step;
             if (y - self.center.y).abs() >= self.height() / 2.0 {
                 continue;
