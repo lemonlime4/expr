@@ -1,6 +1,4 @@
--   exp(-x^2) causes lag
-    -   why did exp(x^2) use to cause lag?
--   (it's solved now)
+-   why did exp(x^2) use to cause lag? (it's solved now)
 
 -   better background grid
     -   make it actually dependent on pixel count
@@ -9,11 +7,11 @@
 -   clamp line segments to viewport to avoid vello "performance cliff"
 -   resample functions on separate thread
 
+-   actually handle newlines in parsing
+    -   currently each assignment/declaration/value has to be 1 line
 -   figure out why `input.txt` sometimes reads empty file
 
--   proper operator associativity
-    -   is this really needed?
-    -   all operators are currently right associative
+-   find out less hacky way to parse unary operator
 -   better adaptive sampling with less line segments
     -   desmos puts two segments on left and right of a discontinuous point, anything to do with that?
 -   optimize x^2 (and add special behavior for fractions?)
