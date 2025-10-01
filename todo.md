@@ -1,5 +1,4 @@
 -   exp(-x^2) causes lag
--   sampled functions should be in graph space and not viewport space
 
 -   better background grid
     -   make it actually dependent on pixel count

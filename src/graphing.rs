@@ -65,30 +65,22 @@ pub fn sample_single_var_function(
     assert!(initial_segment_count >= 2);
     struct Sample {
         /// X coordinate in graph space
-        x: f64,
+        g: Point,
         /// Point in window space
-        p: Point,
-    }
-    impl Sample {
-        fn new(x: f64, y: f64, transform: impl Fn(Point) -> Point) -> Self {
-            Self {
-                x,
-                p: transform(Point { x, y }),
-            }
-        }
+        w: Point,
     }
     impl PartialEq for Sample {
         fn eq(&self, other: &Self) -> bool {
             use std::cmp::Ordering::Equal;
-            self.x.total_cmp(&other.x) == Equal
-                && self.p.x.total_cmp(&other.p.x) == Equal
-                && self.p.y.total_cmp(&other.p.y) == Equal
+            self.g.x.total_cmp(&other.g.x) == Equal
+                && self.w.x.total_cmp(&other.w.x) == Equal
+                && self.w.y.total_cmp(&other.w.y) == Equal
         }
     }
     impl Eq for Sample {}
     impl PartialOrd for Sample {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            self.x.partial_cmp(&other.x)
+            self.g.x.partial_cmp(&other.g.x)
         }
     }
     impl Ord for Sample {
@@ -96,6 +88,13 @@ pub fn sample_single_var_function(
             self.partial_cmp(other).unwrap()
         }
     }
+    let mut sample = |x: f64| {
+        let g = Point { x, y: f(x) };
+        Sample {
+            g,
+            w: graph_to_window(g),
+        }
+    };
 
     let mut samples = Vec::new();
     for i in 0..=initial_segment_count {
@@ -103,7 +102,7 @@ pub fn sample_single_var_function(
             let t = i as f64 / initial_segment_count as f64;
             xmin * (1.0 - t) + xmax * t
         };
-        samples.push(Sample::new(x, f(x), &graph_to_window));
+        samples.push(sample(x));
     }
     const MIN_ANGLE: f64 = 177.0;
     let mut need_resampling = Vec::new();
@@ -114,7 +113,7 @@ pub fn sample_single_var_function(
         need_resampling.clear();
         need_resampling.resize(samples.len() - 1, false);
 
-        for (i, (p1, p2, p3)) in samples.iter().map(|s| s.p).tuple_windows().enumerate() {
+        for (i, (p1, p2, p3)) in samples.iter().map(|s| s.w).tuple_windows().enumerate() {
             match (p1.is_finite(), p2.is_finite(), p3.is_finite()) {
                 (true, true, true) => {
                     if (p1 - p2).normalize().dot((p3 - p2).normalize())
@@ -144,12 +143,15 @@ pub fn sample_single_var_function(
         let mut offset = 0;
         for (i, &need_resampling) in need_resampling.iter().enumerate() {
             if need_resampling {
-                let x = samples[i + offset].x.midpoint(samples[i + offset + 1].x);
-                samples.insert(i + offset + 1, Sample::new(x, f(x), &graph_to_window));
+                let x = samples[i + offset]
+                    .g
+                    .x
+                    .midpoint(samples[i + offset + 1].g.x);
+                samples.insert(i + offset + 1, sample(x));
                 offset += 1;
             }
         }
     }
 
-    samples.into_iter().map(|s| s.p).collect()
+    samples.into_iter().map(|s| s.g).collect()
 }
