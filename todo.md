@@ -6,6 +6,8 @@
     -   add numbers
 -   clamp line segments to viewport to avoid vello "performance cliff"
 
+-   built in constants (pi, e, inf, nan?)
+
 -   actually handle newlines in parsing
     -   currently each assignment/declaration/value has to be 1 line
 -   figure out why `input.txt` sometimes reads empty file
