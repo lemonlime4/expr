@@ -26,3 +26,10 @@ Standalone expressions that contain an `x` will be plotted. Expressions that don
 Note that multiline expressions aren't supported yet.
 
 ## Bugs
+
+-   saving `input.txt` will sometimes load an empty graph
+    -   if this happens often, it may be easier to just run `cargo run` again
+-   zooming too far outside a graph in can cause sudden dramatic slowdowns and maybe crashes
+    -   this is caused by drawing lines far away from the viewport
+    -   zooming very quickly can also cause this for some reason
+-   rectangular rendering artifacts can appear when drawing dense functions like `sin(100/x)`
