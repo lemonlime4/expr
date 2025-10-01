@@ -9,6 +9,8 @@
 
 -   figure out why `input.txt` sometimes reads empty file
 
+-   better adaptive sampling with less line segments
+    -   desmos puts two segments on left and right of a discontinuous point, anything to do with that?
 -   optimize x^2 (and add special behavior for fractions?)
 -   improve the runtime
 -   better (order independent) name resolution
