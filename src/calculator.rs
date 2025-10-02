@@ -334,7 +334,7 @@ impl Calculator {
         };
         let cursor = self.viewport.window_to_graph(self.cursor);
         // let cursor = Point::ZERO; // TODO remove
-        let scale = 1.0 - delta / 5.0;
+        let scale = 1.0 - delta / MOUSE_SCROLL_FACTOR;
 
         self.viewport.width *= scale;
         self.viewport.center = cursor + scale * (self.viewport.center - cursor);
@@ -351,3 +351,6 @@ impl Calculator {
 // }
 
 const ID: Affine = Affine::IDENTITY;
+
+/// Mouse sensitivity. Higher is less sensitive
+const MOUSE_SCROLL_FACTOR: f64 = 8.0;

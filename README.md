@@ -6,6 +6,8 @@ yeah
 
 Install the Cargo package manager and run `cargo run` in the repo's top level (`expr/`).
 
+Drag to move and scroll to zoom. You can adjust scroll sensitivity on the last line of `src/calculator.rs`.
+
 Edit `input.txt` and save to reload.
 
 Press shift to toggle debug view of the functions.
