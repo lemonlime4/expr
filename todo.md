@@ -25,6 +25,7 @@
 -   sliders
 -   point and list types
 -   implicits, parametrics, points, polygons
+-   two-finger touchscreen zooming
 
 -   better parsing errors
     -   example: 0x says expected newline
