@@ -285,8 +285,12 @@ impl Calculator {
                 continue;
             }
             for p in points {
+                if !p.y.is_finite() {
+                    continue;
+                }
+                let p = self.viewport.graph_to_window(*p);
                 let (radius, color) = (1.5, color);
-                let circle = Circle::new(*p, radius);
+                let circle = Circle::new(p, radius);
                 scene.fill(fill, ID, color, None, &circle);
             }
         }
