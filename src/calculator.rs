@@ -100,7 +100,8 @@ impl Viewport {
             .min(2.0 * 10.0_f64.powf((0.5_f64.log10() + size.log10()).ceil()))
             .min(5.0 * 10.0_f64.powf((0.2_f64.log10() + size.log10()).ceil()));
         let substeps = match 10.0_f64.powf(size.log10().rem_euclid(1.0)) {
-            2.0..=5.0 => 4,
+            ..=2.0 => 4,
+            // ..=5.0 => 5,
             _ => 5,
         };
         let step = major_step / substeps as f64;
