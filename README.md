@@ -23,7 +23,7 @@ f(x) := x + sin(x)
 
 Bindings must be defined before they are used.
 
-Standalone expressions that contain an `x` will be plotted. Expressions that don't contain an `x` will be evaluated and printed.
+Standalone expressions that contain an `x` will be plotted. Expressions that don't contain an `x` and variable bindings will be evaluated and printed.
 
 Note that multiline expressions aren't supported yet.
 
