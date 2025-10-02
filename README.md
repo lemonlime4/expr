@@ -25,7 +25,7 @@ Bindings must be defined before they are used.
 
 Standalone expressions that contain an `x` will be plotted. Expressions that don't contain an `x` and variable bindings will be evaluated and printed.
 
-Note that multiline expressions aren't supported yet.
+Note every expression and binding has to be on a single line (for now).
 
 ## Bugs
 
