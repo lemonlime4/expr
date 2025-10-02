@@ -4,7 +4,7 @@ yeah
 
 ## How to use
 
-Install the Cargo package manager and run `cargo run` in the repo's top level (`expr/`).
+Install the Cargo package manager. Clone the repo and run `cargo run` in the top level (`expr/`).
 
 Drag to move and scroll to zoom. You can adjust scroll sensitivity on the last line of `src/calculator.rs`.
 
