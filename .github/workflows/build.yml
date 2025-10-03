@@ -25,13 +25,11 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install cross
-        if: matrix.use_cross == true
-        run: cargo install cross --git https://github.com/cross-rs/cross
-      
       - name: Build with cross
         if: matrix.use_cross == true
-        run: cross build --release --target ${{ matrix.target }}
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+          cross build --release --target ${{ matrix.target }}
 
       - name: Build with cargo
         if: matrix.use_cross != true
@@ -41,4 +39,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/fake-desmos
+          path: target/${{ matrix.target }}/release/expr${{ matrix.os == 'windows-latest' && '.exe' || '' }}
