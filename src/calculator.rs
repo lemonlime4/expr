@@ -182,7 +182,7 @@ impl Calculator {
             cursor: Point::ZERO,
             click_start: None,
             interpreter: Arc::new(Interpreter::new()),
-            draw_debug: false,
+            draw_debug: true,
             sample_tx,
             sampled_functions: RefCell::new(Vec::new()),
             sampled_rx,
@@ -222,23 +222,6 @@ impl Calculator {
     }
 
     pub fn render(&self, scene: &mut Scene) {
-        {
-            let x = 50.0;
-            let y = 50.0;
-            let mut path = BezPath::new();
-            path.move_to(Point { x, y });
-            let x0 = x;
-            let x = x0 + 1e-6;
-            assert!(x0 != x);
-            path.line_to(Point { x, y });
-            scene.stroke(
-                &Stroke::new(10.0),
-                ID,
-                Color::from_rgb8(127, 0, 127),
-                None,
-                &path,
-            );
-        }
         // draw background
         self.viewport.draw_axes(scene);
         self.viewport.draw_background_grid(scene);
